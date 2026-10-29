@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+*.log
+# Datos locales del servidor. Solo el catálogo de TheMealDB se sube: así el despliegue arranca sin descargarlo.
+server/data/*
+!server/data/catalog.json
