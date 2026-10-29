@@ -56,7 +56,7 @@ const TABLES = [
  * Primero se conecta directo a la base (como en un hosting, donde ya existe y el usuario no puede crear otras);
  * solo si no existe (XAMPP la primera vez) intenta crearla.
  */
-export async function initDb() {
+export async function initDb({ quiet = false } = {}) {
   const { host, port, user, password, name } = config.db;
   const poolConfig = {
     host, port, user, password, database: name,
@@ -82,7 +82,28 @@ export async function initDb() {
     pool = p;
     console.log(`MySQL conectado (base "${name}").`);
   } catch (err) {
+    if (quiet) return;
     console.warn(`No se pudo conectar a MySQL: ${err.code ? `${err.code} ` : ''}${err.message}`);
     console.warn('El buscador funciona, pero cuentas, favoritos e historial estarán desactivados.');
   }
+}
+
+/**
+ * Si MySQL no estaba listo al arrancar (contraseña por corregir, base que tarda), reintenta cada minuto en silencio
+ * hasta conectar: así no hace falta reiniciar la app cuando se arregla el problema.
+ */
+export function keepTryingDb(intervalMs = Number(process.env.DB_RETRY_MS) || 60_000) {
+  if (pool) return;
+  let busy = false;
+  const timer = setInterval(async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      await initDb({ quiet: true });
+      if (pool) clearInterval(timer);
+    } finally {
+      busy = false;
+    }
+  }, intervalMs);
+  timer.unref();
 }

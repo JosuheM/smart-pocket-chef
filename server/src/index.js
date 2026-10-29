@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config.js';
-import { initDb, isDbReady } from './db.js';
+import { initDb, isDbReady, keepTryingDb } from './db.js';
 import { initCatalog, catalogSize } from './services/catalog.js';
 import { provider } from './services/translate.js';
 import { rateLimit } from './middleware/rateLimit.js';
@@ -56,5 +56,6 @@ app.listen(config.port, () => {
 });
 
 initDb()
+  .then(() => { if (!isDbReady()) keepTryingDb(); }) // sin base al arrancar: reintenta cada minuto
   .then(() => initCatalog()) // carga la copia local; si falta, sincroniza en segundo plano
   .catch((err) => console.error(`Error al preparar la base y el catálogo: ${err.message}`));
