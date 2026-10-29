@@ -12,21 +12,40 @@ export const setToken = (t) => {
 let onUnauthorized = () => {};
 export const setUnauthorizedHandler = (fn) => { onUnauthorized = fn; };
 
+const RETRY_DELAYS = [600, 1500]; // milisegundos de espera antes de cada reintento
+const RETRY_STATUS = [502, 503, 504]; // respuestas del hosting cuando la app no está lista
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function request(path, { method = 'GET', body, auth = true } = {}) {
   const headers = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body) headers['Content-Type'] = 'application/json';
 
+  // Las consultas que solo leen datos (GET) se repiten solas hasta 2 veces si la red o el hosting fallan un instante
+  // (por ejemplo, cuando una copia de la app se está reiniciando). Las que escriben datos no se repiten.
+  const canRetry = method === 'GET';
+  const offline = () => typeof navigator !== 'undefined' && !navigator.onLine;
   let res;
-  try {
-    res = await fetch(`${BASE}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-  } catch {
-    throw new Error(
-      typeof navigator !== 'undefined' && !navigator.onLine
-        ? 'Sin conexión a internet. Verifica tu red; las recetas que ya abriste y tu lista de compras siguen disponibles.'
-        : 'No pudimos conectar con el servidor. Revisa tu conexión e inténtalo de nuevo en unos minutos.',
-    );
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      res = await fetch(`${BASE}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+      if (canRetry && RETRY_STATUS.includes(res.status) && attempt < RETRY_DELAYS.length) {
+        await sleep(RETRY_DELAYS[attempt]);
+        continue;
+      }
+      break;
+    } catch {
+      if (canRetry && !offline() && attempt < RETRY_DELAYS.length) {
+        await sleep(RETRY_DELAYS[attempt]);
+        continue;
+      }
+      throw new Error(
+        offline()
+          ? 'Sin conexión a internet. Verifica tu red; las recetas que ya abriste y tu lista de compras siguen disponibles.'
+          : 'No pudimos conectar con el servidor. Revisa tu conexión e inténtalo de nuevo en unos minutos.',
+      );
+    }
   }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => null);
