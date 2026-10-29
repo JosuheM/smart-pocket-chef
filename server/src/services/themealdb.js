@@ -17,7 +17,7 @@ export async function getJson(path, { fresh = false, timeout = 8000, retries = 0
   }
 
   // Sin internet: se falla enseguida y quien llama usa la copia local (la sincronización del catálogo sí insiste)
-  if (!fresh && breaker.open) throw new HttpError(502, 'Sin conexión con TheMealDB.');
+  if (!fresh && breaker.open) throw new HttpError(502, 'TheMealDB no responde en este momento. Intenta de nuevo en unos minutos.');
 
   let lastError;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -41,7 +41,8 @@ export async function getJson(path, { fresh = false, timeout = 8000, retries = 0
     }
   }
   breaker.trip(lastError);
-  throw new HttpError(502, `No se pudo conectar con TheMealDB (${lastError?.message ?? 'sin respuesta'}).`);
+  console.warn(`TheMealDB: ${lastError?.message ?? 'sin respuesta'} (${path})`); // el detalle técnico queda en el registro, no en pantalla
+  throw new HttpError(502, 'No pudimos conectar con TheMealDB. Intenta de nuevo en unos segundos.');
 }
 
 function toSteps(text = '') {

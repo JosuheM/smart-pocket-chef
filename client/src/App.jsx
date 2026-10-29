@@ -64,12 +64,19 @@ export default function App() {
       setAuthDialog({ notice: 'Tu sesión venció. Ingresa de nuevo para continuar.' });
     });
     if (!getToken()) return;
-    api.me().then((d) => setUser(d.user)).catch(() => setToken(null));
+    api.me().then((d) => setUser(d.user)).catch((e) => {
+      // Solo una respuesta 401 significa "sesión inválida". Si la base o el servidor fallan, la sesión se conserva.
+      if (e.status === 401) setToken(null);
+      else notify(`${e.message} Tu sesión sigue guardada.`, 'error');
+    });
   }, []);
 
   useEffect(() => {
     if (!user) { setFavorites([]); return; }
-    api.favorites().then(setFavorites).catch(() => setFavorites([]));
+    api.favorites().then(setFavorites).catch((e) => {
+      setFavorites([]);
+      if (e.status !== 401) notify(`No pudimos cargar tus favoritas. ${e.message}`, 'error'); // el 401 ya lo avisa el cierre de sesión
+    });
   }, [user]);
 
   // ---------- Datos de apoyo (portada de Unsplash y categorías) ----------

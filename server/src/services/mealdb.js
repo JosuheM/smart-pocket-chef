@@ -134,6 +134,7 @@ async function getLocalRecipe(meal, haveTerms, pantry) {
     source: '',
     steps: meal.steps,
     translation: null,
+    translationFailed: false,
     ingredients: meal.ingredients.map((ing) => {
       const staple = pantry && isStaple(ing.name);
       const s = stem(ing.name);
@@ -197,6 +198,8 @@ export async function getRecipe(id, haveTerms = [], pantry = false) {
     source: meal.source,
     steps,
     translation: provider,
+    // Si hay traductor pero ningún paso cambió, el servicio no respondió o agotó su límite: la pantalla lo avisa
+    translationFailed: Boolean(provider) && meal.steps.length > 0 && steps.every((s, i) => s === meal.steps[i]),
     ingredients: marked.map((ing) => ({
       name: cap(ingredientEs(ing.name) ?? viaApi.get(ing.name) ?? ing.name),
       nameEn: ing.name,

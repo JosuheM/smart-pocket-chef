@@ -175,7 +175,13 @@ export default function RecipeDrawer({ id, haveTerms, pantry, user, isFav, onTog
                   ) : (
                     <p className="muted">Esta receta no trae instrucciones.</p>
                   )}
-                  {recipe.translation && (
+                  {recipe.translationFailed && (
+                    <p className="notice" role="status">
+                      No pudimos traducir esta receta ahora: el servicio de traducción no respondió o llegó a su límite diario.
+                      Se muestra en inglés; vuelve a abrirla más tarde y saldrá en español.
+                    </p>
+                  )}
+                  {recipe.translation && !recipe.translationFailed && (
                     <p className="muted translation-note">
                       Receta traducida automáticamente del inglés; algunas frases pueden sonar literales.
                       {recipe.source && <> Original: <a href={recipe.source} target="_blank" rel="noreferrer">fuente</a>.</>}

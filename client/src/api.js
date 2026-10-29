@@ -25,16 +25,20 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     throw new Error(
       typeof navigator !== 'undefined' && !navigator.onLine
         ? 'Sin conexión a internet. Verifica tu red; las recetas que ya abriste y tu lista de compras siguen disponibles.'
-        : 'No se pudo conectar con el servidor. Revisa que el backend esté encendido.',
+        : 'No pudimos conectar con el servidor. Revisa tu conexión e inténtalo de nuevo en unos minutos.',
     );
   }
   if (res.status === 204) return null;
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch(() => null);
   if (!res.ok) {
     if (res.status === 401 && token && auth) onUnauthorized();
-    throw Object.assign(new Error(data.error || 'Ocurrió un error inesperado.'), { status: res.status });
+    // Una respuesta que no viene de nuestra API (por ejemplo, el 503 del hosting si la app está caída) no trae JSON
+    const fallback = res.status >= 500
+      ? 'El servidor no está disponible en este momento. Inténtalo de nuevo en unos minutos.'
+      : 'Ocurrió un error inesperado.';
+    throw Object.assign(new Error(data?.error || fallback), { status: res.status });
   }
-  return data;
+  return data ?? {};
 }
 
 const csv = (list) => encodeURIComponent(list.join(','));
