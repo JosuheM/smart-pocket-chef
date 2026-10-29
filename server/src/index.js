@@ -49,8 +49,12 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: err.expose ? err.message : 'Error interno del servidor.' });
 });
 
-await initDb();
-await initCatalog(); // carga la copia local; si falta, sincroniza en segundo plano
+// Sin "await" de nivel superior: Hostinger carga este archivo con require() y Node lo rechaza (ERR_REQUIRE_ASYNC_MODULE).
+// El puerto se abre enseguida; la base y el catálogo se preparan a continuación (hasta entonces, las cuentas responden 503).
 app.listen(config.port, () => {
   console.log(`Smart Pocket Chef API en http://localhost:${config.port}`);
 });
+
+initDb()
+  .then(() => initCatalog()) // carga la copia local; si falta, sincroniza en segundo plano
+  .catch((err) => console.error(`Error al preparar la base y el catálogo: ${err.message}`));
