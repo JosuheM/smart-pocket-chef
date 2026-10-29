@@ -2,7 +2,7 @@ import { config } from '../config.js';
 import { HttpError } from '../utils/http.js';
 import { normalize, stem, stemMatches } from '../utils/text.js';
 import { DISH_WORDS, ingredientEs, isStaple, spanishToEnglish } from '../utils/ingredients-es.js';
-import { CATEGORIES, areaEs, categoryEs, measureEs } from '../utils/spanish.js';
+import { CATEGORIES, areaEs, categoryEs, measureEs, poundsToMetric } from '../utils/spanish.js';
 import { lookupMeal, photo, randomMeal } from './themealdb.js';
 import {
   catalogMeal, countByArea, ensureCatalog, exploreMeals, isKnown, isPartial, listCategories, randomCatalogMeal, searchMeals, suggestIngredients,
@@ -196,7 +196,7 @@ export async function getRecipe(id, haveTerms = [], pantry = false) {
     imageCredit: img.credit,
     youtube: meal.youtube,
     source: meal.source,
-    steps,
+    steps: steps.map(poundsToMetric), // los pasos también pasan de libras a gramos o kilos
     translation: provider,
     // Si hay traductor pero ningún paso cambió, el servicio no respondió o agotó su límite: la pantalla lo avisa
     translationFailed: Boolean(provider) && meal.steps.length > 0 && steps.every((s, i) => s === meal.steps[i]),
