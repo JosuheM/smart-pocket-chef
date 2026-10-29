@@ -115,8 +115,15 @@ export function refreshCatalog() {
   return loading;
 }
 
+let startup = null; // la lectura de la copia local; las búsquedas que lleguen durante el arranque la esperan
+
 /** Carga la copia local (arranque instantáneo) y refresca en segundo plano si falta o está vieja. */
-export async function initCatalog() {
+export function initCatalog() {
+  startup ??= loadStartup();
+  return startup;
+}
+
+async function loadStartup() {
   try {
     const snap = JSON.parse(await fs.readFile(FILE, 'utf8'));
     if (Array.isArray(snap.meals) && snap.meals.length) {
@@ -137,6 +144,7 @@ export async function initCatalog() {
  * (las peruanas) y reintenta sincronizar cada minuto; `isPartial()` avisa a la pantalla.
  */
 export async function ensureCatalog() {
+  if (startup) await startup; // si el arranque aún está leyendo la copia local, no se descarga todo de nuevo
   if (meals.length && !partial) return;
   if (meals.length) { // catálogo incompleto: se reintenta en segundo plano sin hacer esperar a nadie
     if (Date.now() >= retryAt && !loading) {

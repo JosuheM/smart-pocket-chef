@@ -55,7 +55,8 @@ app.listen(config.port, () => {
   console.log(`Smart Pocket Chef API en http://localhost:${config.port}`);
 });
 
+// El catálogo y la base son independientes: el catálogo se lee de inmediato, sin esperar a MySQL.
+initCatalog().catch((err) => console.error(`Error al cargar el catálogo: ${err.message}`));
 initDb()
   .then(() => { if (!isDbReady()) keepTryingDb(); }) // sin base al arrancar: reintenta cada minuto
-  .then(() => initCatalog()) // carga la copia local; si falta, sincroniza en segundo plano
-  .catch((err) => console.error(`Error al preparar la base y el catálogo: ${err.message}`));
+  .catch((err) => console.error(`Error al preparar la base: ${err.message}`));
