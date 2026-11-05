@@ -2,16 +2,23 @@
 //  - Páginas y archivos de la app: se sirven de la copia guardada si la red falla.
 //  - Recetas de la API (/api/recipes): primero la red, y si falla, la última respuesta guardada.
 //  - Fotos, QR y fuentes (TheMealDB, Unsplash, QuickChart, Google Fonts): copia guardada primero y se actualiza detrás.
-// No se guarda nada de cuentas, favoritas ni historial.
-const SHELL = 'spc-shell-v1';
-const DATA = 'spc-data-v1';
-const MEDIA = 'spc-media-v1';
+//  - Instalación como app (PWA): el manifest y los iconos se guardan al instalar para que la app abra sin internet.
+// No se guarda nada de cuentas, despensa, notas, favoritas ni historial (esas rutas nunca pasan por la caché).
+const SHELL = 'spc-shell-v2';
+const DATA = 'spc-data-v2';
+const MEDIA = 'spc-media-v2';
+const PRECACHE = ['/', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 const KEEP = [SHELL, DATA, MEDIA];
 const MEDIA_HOSTS = ['images.unsplash.com', 'www.themealdb.com', 'quickchart.io', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 const LIMITS = { [DATA]: 400, [MEDIA]: 400 };
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(SHELL).then((cache) => cache.add('/').catch(() => {})).then(() => self.skipWaiting()));
+  // Cada archivo por separado: si uno falla (por ejemplo, sin red), los demás igual se guardan
+  event.waitUntil(
+    caches.open(SHELL)
+      .then((cache) => Promise.allSettled(PRECACHE.map((url) => cache.add(url))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -76,6 +83,14 @@ self.addEventListener('fetch', (event) => {
 
   // Archivos de la app con nombre único (los genera Vite al compilar): nunca cambian
   if (url.origin === self.location.origin && url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(request, { cacheName: SHELL }).then((hit) => hit || fetch(request).then((response) => { put(SHELL, request, response); return response; })),
+    );
+    return;
+  }
+
+  // Manifest e iconos de la app instalada: copia guardada primero
+  if (url.origin === self.location.origin && (url.pathname === '/manifest.json' || url.pathname.startsWith('/icons/'))) {
     event.respondWith(
       caches.match(request, { cacheName: SHELL }).then((hit) => hit || fetch(request).then((response) => { put(SHELL, request, response); return response; })),
     );

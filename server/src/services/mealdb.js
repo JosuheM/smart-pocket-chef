@@ -2,10 +2,14 @@ import { config } from '../config.js';
 import { HttpError } from '../utils/http.js';
 import { normalize, stem, stemMatches } from '../utils/text.js';
 import { DISH_WORDS, ingredientEs, isStaple, spanishToEnglish } from '../utils/ingredients-es.js';
-import { CATEGORIES, areaEs, categoryEs, measureEs, poundsToMetric } from '../utils/spanish.js';
-import { lookupMeal, photo, randomMeal } from './themealdb.js';
+import { CATEGORIES, areaEs, categoryEs, measureEs } from '../utils/spanish.js';
+import { toMetric } from '../utils/units.js';
+import { scaleMeasure } from '../utils/measures.js';
+import { allergensOf, dietFlags } from '../utils/diet.js';
+import { filterByArea, lookupMeal, photo, randomMeal } from './themealdb.js';
 import {
-  catalogMeal, countByArea, ensureCatalog, exploreMeals, isKnown, isPartial, listCategories, randomCatalogMeal, searchMeals, suggestIngredients,
+  catalogMeal, countByArea, ensureCatalog, exploreMeals, isKnown, isPartial, listAreas, listCategories, mealFlags, randomCatalogMeal,
+  searchMeals, suggestIngredients,
 } from './catalog.js';
 import { heroPhoto, searchPhoto, trackUse } from './unsplash.js';
 import { provider, translateMany, translateOne } from './translate.js';
@@ -74,16 +78,18 @@ async function decorate(page) {
 }
 
 const validCategory = (c) => (CATEGORIES.includes(c) ? c : '');
+const validArea = (a) => (/^[A-Za-z ]{1,30}$/.test(a ?? '') ? a : '');
 
 function paginate(list, facets, offset, limit) {
   return { total: list.length, facets, hasMore: offset + limit < list.length, page: list.slice(offset, offset + limit) };
 }
 
-export async function searchRecipes({ terms, mode, category, sort, pantry, limit, offset }) {
+export async function searchRecipes({ terms, mode, category, sort, pantry, area, diet = [], limit, offset }) {
   await ensureCatalog();
   const groups = await resolveTerms(terms);
   const { list, facets } = searchMeals({
     groups, pantry, mode: mode === 'all' ? 'all' : 'any', category: validCategory(category), sort: sort === 'missing' ? 'missing' : 'match',
+    area: validArea(area), diet,
   });
   const { page, ...meta } = paginate(list, facets, offset, limit);
   return {
@@ -109,12 +115,66 @@ async function queryTokens(q) {
   return tokens.map((c) => [...c]);
 }
 
-export async function exploreRecipes({ q, category, area, limit, offset }) {
+export async function exploreRecipes({ q, category, area, diet = [], limit, offset }) {
   await ensureCatalog();
+  const cleanArea = validArea(area);
+
+  // Si el catálogo completo aún no se descargó, el país se pide directo a TheMealDB (filter.php?a=) en vez de mostrar vacío.
+  if (isPartial() && cleanArea && cleanArea !== 'Peruvian' && !q && !category && !diet.length) {
+    try {
+      const live = (await filterByArea(cleanArea)).map((m) => ({ ...m, nameEn: m.name, category: '', area: cleanArea, local: false }));
+      const { page, ...meta } = paginate(live, [], offset, limit);
+      return { ingredients: [], unknown: [], ...meta, results: await decorate(page) };
+    } catch { /* sin internet: se sigue con las recetas propias */ }
+  }
+
   const tokens = q ? await queryTokens(q) : [];
-  const { list, facets } = exploreMeals({ tokens, category: validCategory(category), area: /^[A-Za-z ]{1,30}$/.test(area ?? '') ? area : '' });
+  const { list, facets } = exploreMeals({ tokens, category: validCategory(category), area: cleanArea, diet });
   const { page, ...meta } = paginate(list, facets, offset, limit);
   return { ingredients: [], unknown: [], ...meta, results: await decorate(page) };
+}
+
+/**
+ * "Hoy puedes cocinar X recetas con lo que tienes": cruza la despensa con el catálogo (TheMealDB + recetas propias).
+ * Una receta está lista cuando no le falta ningún ingrediente (sal, pimienta, agua y aceite no cuentan como faltantes).
+ */
+export async function pantryOverview(terms, { diet = [], limit = 12, offset = 0 } = {}) {
+  await ensureCatalog();
+  const groups = await resolveTerms(terms);
+  const unknown = groups.filter((g) => !g.known).map((g) => g.label);
+  if (!groups.some((g) => g.known)) return { total: 0, almost: 0, hasMore: false, unknown, results: [] };
+  const { list } = searchMeals({ groups, pantry: true, mode: 'any', category: '', sort: 'missing', diet });
+  const ready = list.filter((r) => r.missing === 0);
+  const almost = list.filter((r) => r.missing > 0 && r.missing <= 2).length;
+  return {
+    total: ready.length, almost, hasMore: offset + limit < ready.length, unknown, results: await decorate(ready.slice(offset, offset + limit)),
+  };
+}
+
+/** Ingredientes de una receta ya en español y escalados a `servings` personas (la base son 2), para el plan semanal. */
+export async function planMeal(id, servings = 2) {
+  await ensureCatalog().catch(() => {});
+  let meal = catalogMeal(id);
+  if (!meal) {
+    try { meal = await lookupMeal(id); } catch (err) { if (err.status === 400) throw err; }
+  }
+  if (!meal) throw new HttpError(404, 'No encontramos una de las recetas del plan.');
+  const factor = servings / 2;
+
+  if (meal.local) {
+    return { id: meal.id, name: meal.name, ingredients: meal.ingredients.map((i) => ({ name: i.es, measure: scaleMeasure(i.measure, factor) })) };
+  }
+  const unknownNames = [...new Set(meal.ingredients.filter((i) => !ingredientEs(i.name)).map((i) => i.name))];
+  const out = await translateMany([meal.name, ...unknownNames]);
+  const viaApi = new Map(unknownNames.map((n, i) => [n, out[i + 1]]));
+  return {
+    id: meal.id,
+    name: out[0].trim(),
+    ingredients: meal.ingredients.map((i) => ({
+      name: cap(ingredientEs(i.name) ?? viaApi.get(i.name) ?? i.name),
+      measure: scaleMeasure(toMetric(measureEs(i.measure)), factor),
+    })),
+  };
 }
 
 /** Receta propia (comida peruana): ya está en español, solo se marcan los ingredientes y se busca la foto. */
@@ -133,6 +193,7 @@ async function getLocalRecipe(meal, haveTerms, pantry) {
     youtube: '',
     source: '',
     steps: meal.steps,
+    allergens: allergensOf(mealFlags(meal.id) ?? dietFlags(meal.ingredients.map((i) => i.name))),
     translation: null,
     translationFailed: false,
     ingredients: meal.ingredients.map((ing) => {
@@ -196,14 +257,15 @@ export async function getRecipe(id, haveTerms = [], pantry = false) {
     imageCredit: img.credit,
     youtube: meal.youtube,
     source: meal.source,
-    steps: steps.map(poundsToMetric), // los pasos también pasan de libras a gramos o kilos
+    steps: steps.map(toMetric), // los pasos también pasan de libras y onzas a gramos o kilos, y de °F a °C
+    allergens: allergensOf(dietFlags(meal.ingredients.map((i) => i.name))),
     translation: provider,
     // Si hay traductor pero ningún paso cambió, el servicio no respondió o agotó su límite: la pantalla lo avisa
     translationFailed: Boolean(provider) && meal.steps.length > 0 && steps.every((s, i) => s === meal.steps[i]),
     ingredients: marked.map((ing) => ({
       name: cap(ingredientEs(ing.name) ?? viaApi.get(ing.name) ?? ing.name),
       nameEn: ing.name,
-      measure: measureEs(ing.measure),
+      measure: toMetric(measureEs(ing.measure)),
       have: ing.have,
       staple: ing.staple,
     })),
@@ -220,7 +282,7 @@ export async function randomRecipeId() {
 
 export async function recipeMeta() {
   await ensureCatalog();
-  return { categories: listCategories(), peru: countByArea('Peruvian'), partial: isPartial() };
+  return { categories: listCategories(), areas: listAreas(), peru: countByArea('Peruvian'), partial: isPartial() };
 }
 
 export const ingredientSuggestions = (q) => suggestIngredients(q);

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   exploreRecipes, getRecipe, heroImage, ingredientSuggestions, randomRecipeId, recipeMeta, searchRecipes,
 } from '../services/mealdb.js';
+import { parseDiet } from '../utils/diet.js';
 import { HttpError, clampInt, wrap } from '../utils/http.js';
 
 const router = Router();
@@ -9,7 +10,8 @@ const list = (v) => String(v ?? '').split(',').map((s) => s.trim()).filter(Boole
 const paging = (q) => ({ limit: clampInt(q.limit, 12, 1, 24), offset: clampInt(q.offset, 0, 0, 2000) });
 const flag = (v) => v === '1' || v === 'true';
 
-// GET /api/recipes/search?ingredients=pollo,tomate&mode=any|all&sort=match|missing&category=Chicken&pantry=1&limit=12&offset=0
+// GET /api/recipes/search?ingredients=pollo,tomate&mode=any|all&sort=match|missing&category=Chicken&area=Italian&diet=gluten,dairy&pantry=1&limit=12&offset=0
+// diet = recetas SIN esos ingredientes: gluten, dairy (lácteos), nuts (frutos secos)
 router.get('/search', wrap(async (req, res) => {
   const terms = list(req.query.ingredients);
   if (!terms.length) throw new HttpError(400, 'Escribe al menos un ingrediente.');
@@ -18,18 +20,20 @@ router.get('/search', wrap(async (req, res) => {
     mode: req.query.mode,
     sort: req.query.sort,
     category: String(req.query.category ?? ''),
+    area: String(req.query.area ?? ''),
+    diet: parseDiet(req.query.diet),
     pantry: flag(req.query.pantry),
     ...paging(req.query),
   }));
 }));
 
-// GET /api/recipes/explore?q=lasaña&category=Pasta&area=Peruvian  (por nombre, categoría y/o país)
+// GET /api/recipes/explore?q=lasaña&category=Pasta&area=Peruvian&diet=nuts  (por nombre, categoría y/o país)
 router.get('/explore', wrap(async (req, res) => {
   const q = String(req.query.q ?? '').trim().slice(0, 60);
   const category = String(req.query.category ?? '');
   const area = String(req.query.area ?? '');
   if (!q && !category && !area) throw new HttpError(400, 'Escribe el nombre de un platillo o elige una categoría.');
-  res.json(await exploreRecipes({ q, category, area, ...paging(req.query) }));
+  res.json(await exploreRecipes({ q, category, area, diet: parseDiet(req.query.diet), ...paging(req.query) }));
 }));
 
 // GET /api/recipes/peru  -> atajo: los platos peruanos (propios, TheMealDB no trae ninguno)

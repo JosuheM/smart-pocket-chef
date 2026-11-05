@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken, setToken, setUnauthorizedHandler } from './api.js';
-import { useCart, useLocalStorage, useOnline, useToasts } from './hooks.js';
+import { useCart, useInstallPrompt, useLocalStorage, useOnline, usePlan, useToasts } from './hooks.js';
 import Header from './components/Header.jsx';
 import SearchBar from './components/SearchBar.jsx';
+import FiltersBar from './components/FiltersBar.jsx';
+import PantryView from './components/PantryView.jsx';
+import PlanView from './components/PlanView.jsx';
 import ResultsToolbar from './components/ResultsToolbar.jsx';
 import { RecipeGrid, RecipeSkeletons } from './components/RecipeGrid.jsx';
 import RecipeDrawer from './components/RecipeDrawer.jsx';
@@ -25,7 +28,8 @@ function readUrl() {
 
 const sameBase = (a, b) =>
   Boolean(a) && a.kind === b.kind
-  && (a.kind === 'ingredients' ? a.terms.join('|') === b.terms.join('|') : a.q === b.q && (a.area ?? '') === (b.area ?? ''));
+  && (a.area ?? '') === (b.area ?? '') && (a.diet ?? []).join() === (b.diet ?? []).join()
+  && (a.kind === 'ingredients' ? a.terms.join('|') === b.terms.join('|') : a.q === b.q);
 
 export default function App() {
   const initial = useRef(null);
@@ -33,9 +37,13 @@ export default function App() {
 
   const [user, setUser] = useState(null);
   const [authDialog, setAuthDialog] = useState(null); // null | { notice }
-  const [view, setView] = useState('search'); // search | favorites | list | history
+  const [view, setView] = useState('search'); // search | pantry | plan | favorites | list | history
   const [searchMode, setSearchMode] = useState('ingredients'); // ingredients | name
-  const [pantry, setPantry] = useLocalStorage('spc_pantry', true);
+  const [pantry, setPantry] = useLocalStorage('spc_pantry', true); // true: sal, pimienta, agua y aceite no cuentan como faltantes
+  const [diet, setDiet] = useLocalStorage('spc_diet', []); // gluten | dairy | nuts: recetas SIN esos ingredientes
+  const [area, setArea] = useState(initial.current.area); // país (cocina de origen) elegido en el filtro
+  const [areas, setAreas] = useState([]);
+  const [pantryTotal, setPantryTotal] = useState(null); // "Hoy puedes cocinar X recetas con lo que tienes"
   const [ingredients, setIngredients] = useLocalStorage('spc_ingredients', []);
   const [prefs, setPrefs] = useState({ mode: 'any', sort: 'match' });
   const [nameText, setNameText] = useState('');
@@ -49,7 +57,10 @@ export default function App() {
   const [partialCatalog, setPartialCatalog] = useState(false);
   const online = useOnline();
   const cart = useCart();
+  const plan = usePlan();
+  const { canInstall, install } = useInstallPrompt();
   const { toasts, notify, dismiss } = useToasts();
+  const dietKey = diet.join(',');
   const requestId = useRef(0);
   const feedRef = useRef(null);
   feedRef.current = feed;
@@ -82,8 +93,20 @@ export default function App() {
   // ---------- Datos de apoyo (portada de Unsplash y categorías) ----------
   useEffect(() => {
     api.hero().then((h) => h?.image && setHero(h)).catch(() => {});
-    api.meta().then((m) => { setCategories(m.categories); setPeruCount(m.peru ?? 0); setPartialCatalog(Boolean(m.partial)); }).catch(() => {});
+    api.meta().then((m) => { setCategories(m.categories); setAreas(m.areas ?? []); setPeruCount(m.peru ?? 0); setPartialCatalog(Boolean(m.partial)); }).catch(() => {});
   }, []);
+
+  // Con sesión iniciada, la portada avisa cuántas recetas se pueden cocinar con la despensa guardada
+  useEffect(() => {
+    if (!user) { setPantryTotal(null); return undefined; }
+    if (view !== 'search') return undefined;
+    let alive = true;
+    api.pantrySummary({ diet, limit: 1 })
+      .then((d) => alive && setPantryTotal(d.items.length ? d.total : null))
+      .catch(() => alive && setPantryTotal(null));
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, view, dietKey]);
 
   // ---------- Búsqueda ----------
   const runQuery = useCallback(async (query, append = false) => {
@@ -97,8 +120,8 @@ export default function App() {
     try {
       const page = { offset: append ? feedRef.current.results.length : 0, limit: 12 };
       const data = query.kind === 'ingredients'
-        ? await api.search({ ingredients: query.terms, mode: query.mode, sort: query.sort, category: query.category, pantry: query.pantry, ...page })
-        : await api.explore({ q: query.q, category: query.category, area: query.area, ...page });
+        ? await api.search({ ingredients: query.terms, mode: query.mode, sort: query.sort, category: query.category, area: query.area, diet: query.diet, pantry: query.pantry, ...page })
+        : await api.explore({ q: query.q, category: query.category, area: query.area, diet: query.diet, ...page });
       if (id !== requestId.current) return;
       setFeed((f) => ({
         query,
@@ -119,13 +142,13 @@ export default function App() {
 
   // Si la URL trae una búsqueda, se ejecuta al abrir la página
   useEffect(() => {
-    const { terms, q, category, area } = initial.current;
+    const { terms, q, category, area: urlArea } = initial.current;
     if (terms.length) {
       setIngredients(terms);
-      runQuery({ kind: 'ingredients', terms, mode: 'any', sort: 'match', category: '', pantry });
-    } else if (q || category || area) {
+      runQuery({ kind: 'ingredients', terms, mode: 'any', sort: 'match', category: '', pantry, area: urlArea, diet });
+    } else if (q || category || urlArea) {
       if (q) { setSearchMode('name'); setNameText(q); }
-      runQuery({ kind: 'explore', q, category, area });
+      runQuery({ kind: 'explore', q, category, area: urlArea, diet });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -138,8 +161,8 @@ export default function App() {
     else if (q?.kind === 'explore') {
       if (q.q) p.set('q', q.q);
       if (q.category) p.set('c', q.category);
-      if (q.area) p.set('a', q.area);
     }
+    if (q?.area) p.set('a', q.area);
     if (selectedId) p.set('r', selectedId);
     const s = p.toString();
     history.replaceState(null, '', s ? `?${s}` : location.pathname);
@@ -147,17 +170,37 @@ export default function App() {
 
   const searchIngredients = (list) => {
     setIngredients(list);
-    runQuery({ kind: 'ingredients', terms: list, ...prefs, category: '', pantry });
+    runQuery({ kind: 'ingredients', terms: list, ...prefs, category: '', pantry, area, diet });
   };
   const searchName = (q) => {
     setNameText(q);
-    runQuery({ kind: 'explore', q, category: '' });
+    runQuery({ kind: 'explore', q, category: '', area, diet });
   };
-  const exploreCategory = (category) => runQuery({ kind: 'explore', q: '', category });
-  const explorePeru = () => { setView('search'); runQuery({ kind: 'explore', q: '', category: '', area: 'Peruvian' }); };
+  const exploreCategory = (category) => runQuery({ kind: 'explore', q: '', category, area, diet });
+  const explorePeru = () => { setView('search'); setArea('Peruvian'); runQuery({ kind: 'explore', q: '', category: '', area: 'Peruvian', diet }); };
   const refine = (patch) => {
     if ('mode' in patch || 'sort' in patch) setPrefs((p) => ({ ...p, ...patch }));
     runQuery({ ...feed.query, ...patch });
+  };
+
+  // Filtros de dieta y país: se aplican a la búsqueda que esté en pantalla y a las siguientes
+  const changeDiet = (list) => {
+    setDiet(list);
+    if (feed) runQuery({ ...feed.query, diet: list });
+  };
+  const changeArea = (value) => {
+    setArea(value);
+    if (feed) {
+      const query = { ...feed.query, area: value };
+      if (query.kind === 'explore' && !query.q && !query.category && !value) { setFeed(null); return; } // sin nada que explorar
+      runQuery(query);
+    } else if (value) {
+      runQuery({ kind: 'explore', q: '', category: '', area: value, diet });
+    }
+  };
+  const searchWithPantry = (list) => {
+    goTo('search');
+    searchIngredients(list.slice(0, MAX_TERMS));
   };
   const changePantry = (value) => {
     setPantry(value);
@@ -202,6 +245,7 @@ export default function App() {
   const logout = () => {
     setToken(null);
     setUser(null);
+    setPantryTotal(null);
     if (view === 'favorites' || view === 'history') setView('search');
     notify('Cerraste sesión.');
   };
@@ -235,7 +279,17 @@ export default function App() {
   return (
     <>
       <a className="skip" href="#contenido">Saltar al contenido</a>
-      <Header user={user} view={view} onView={goTo} onLogin={() => openLogin()} onLogout={logout} listCount={cart.pending.length} />
+      <Header
+        user={user}
+        view={view}
+        onView={goTo}
+        onLogin={() => openLogin()}
+        onLogout={logout}
+        listCount={cart.pending.length}
+        planCount={plan.meals.length}
+        canInstall={canInstall}
+        onInstall={install}
+      />
 
       <main id="contenido">
         {!online && (
@@ -279,6 +333,15 @@ export default function App() {
                 </small>
               )}
             </section>
+
+            {user && pantryTotal !== null && (
+              <button className="pantry-banner" onClick={() => goTo('pantry')}>
+                <span>Hoy puedes cocinar <strong>{pantryTotal}</strong> {pantryTotal === 1 ? 'receta' : 'recetas'} con lo que tienes</span>
+                <em>Ver mi despensa →</em>
+              </button>
+            )}
+
+            <FiltersBar diet={diet} onDiet={changeDiet} area={area} onArea={changeArea} areas={areas} />
 
             {feed ? (
               <section>
@@ -331,6 +394,23 @@ export default function App() {
           </>
         )}
 
+        {view === 'pantry' && (
+          <PantryView
+            user={user}
+            diet={diet}
+            searchTerms={ingredients}
+            favIds={favIds}
+            onOpen={setSelectedId}
+            onToggleFav={toggleFavorite}
+            onNeedLogin={openLogin}
+            onSearchWith={searchWithPantry}
+            onTotal={setPantryTotal}
+            notify={notify}
+          />
+        )}
+
+        {view === 'plan' && <PlanView plan={plan} user={user} cart={cart} onOpen={setSelectedId} onSearch={() => goTo('search')} notify={notify} />}
+
         {view === 'favorites' && (
           <section>
             {!user ? (
@@ -366,9 +446,12 @@ export default function App() {
           haveTerms={ingredients}
           pantry={pantry}
           user={user}
+          diet={diet}
+          plan={plan}
           isFav={favIds.has(selectedId)}
           onToggleFav={toggleFavorite}
           onAddToList={cart.add}
+          onNeedLogin={openLogin}
           onClose={() => setSelectedId(null)}
           notify={notify}
         />

@@ -83,6 +83,12 @@ export async function lookupMeal(id) {
   return data.meals?.[0] ? parseMeal(data.meals[0]) : null;
 }
 
+/** Platos de un país con filter.php?a= (id, nombre y foto). Se usa cuando el catálogo local aún no se descargó. */
+export async function filterByArea(area) {
+  const data = await getJson(`/filter.php?a=${encodeURIComponent(area)}`);
+  return (data.meals ?? []).map((m) => ({ id: m.idMeal, name: (m.strMeal || '').trim(), thumb: m.strMealThumb || '' }));
+}
+
 export async function randomMeal() {
   const data = await getJson('/random.php', { fresh: true });
   return data.meals?.[0] ? parseMeal(data.meals[0]) : null;

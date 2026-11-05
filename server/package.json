@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "warmup": "node scripts/warmup.js"
+    "warmup": "node scripts/warmup.js",
+    "seed": "node scripts/seed-peru.js",
+    "test": "node --test test/"
   },
   "engines": { "node": ">=18.17" },
   "dependencies": {

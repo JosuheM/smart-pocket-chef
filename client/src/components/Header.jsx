@@ -1,11 +1,14 @@
 const TABS = [
   ['search', 'Buscar'],
+  ['pantry', 'Despensa'],
+  ['plan', 'Plan semanal'],
   ['favorites', 'Favoritas'],
   ['list', 'Mi lista'],
   ['history', 'Historial'],
 ];
 
-export default function Header({ user, view, onView, onLogin, onLogout, listCount }) {
+export default function Header({ user, view, onView, onLogin, onLogout, listCount, planCount, canInstall, onInstall }) {
+  const badge = { list: listCount, plan: planCount };
   return (
     <header className="topbar">
       <button className="brand" onClick={() => onView('search')} aria-label="Smart Pocket Chef, ir al inicio">
@@ -20,12 +23,13 @@ export default function Header({ user, view, onView, onLogin, onLogout, listCoun
         {TABS.map(([id, label]) => (
           <button key={id} onClick={() => onView(id)} aria-current={view === id ? 'page' : undefined}>
             {label}
-            {id === 'list' && listCount > 0 && <span className="count" aria-label={`${listCount} por comprar`}>{listCount}</span>}
+            {badge[id] > 0 && <span className="count" aria-label={id === 'plan' ? `${badge[id]} recetas en el plan` : `${badge[id]} por comprar`}>{badge[id]}</span>}
           </button>
         ))}
       </nav>
 
       <div className="account">
+        {canInstall && <button className="btn" onClick={onInstall} title="Instala Smart Pocket Chef como aplicación">Instalar app</button>}
         {user ? (
           <>
             <span>Hola, {user.name.split(' ')[0]}</span>

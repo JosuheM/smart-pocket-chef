@@ -56,7 +56,7 @@ const MEASURE_RULES = [
 
 // ---------- Libras a gramos / kilos ----------
 // TheMealDB mide en libras ("1 lb", "2 Lbs", "4-5 pound", "1lb 8 oz"). Aquí se pasan a g (menos de 1 kg) o a kg.
-const QTY = String.raw`\d+(?:[.,]\d+)?\s*[½¼¾⅓⅔⅛]|[½¼¾⅓⅔⅛]|\d+(?:[.,]\d+)?(?:\s+\d+\/\d+)?|\d+\/\d+`; // 1, 1.5, 1/2, 1 1/2, ½, 1½
+export const QTY = String.raw`\d+(?:[.,]\d+)?\s*[½¼¾⅓⅔⅛]|[½¼¾⅓⅔⅛]|\d+(?:[.,]\d+)?(?:\s+\d+\/\d+)?|\d+\/\d+`; // 1, 1.5, 1/2, 1 1/2, ½, 1½
 const FRACTIONS = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3, '⅛': 0.125 };
 const LB_UNIT = String.raw`(?:lbs?|pounds?|libras?)(?![a-záéíóúñ])(\.)?`; // el punto se decide aparte: "1 lb. small" lo consume, "1 lb. Then" no
 const POUNDS = new RegExp(`(${QTY})(?:\\s*(?:-|–|a|to)\\s*(${QTY}))?\\s*${LB_UNIT}(?:\\s+(${QTY})\\s*oz\\b)?`, 'gi');
@@ -66,13 +66,13 @@ const METRIC_BEFORE = /\d[\d.,]*\s*(?:g|kg|gr|grams?|gramos?)\s*\/\s*$/i; // "65
 const G_PER_LB = 453.592;
 const G_PER_OZ = 28.3495;
 
-const toNumber = (text) => text.trim().replace(',', '.').replace(/[½¼¾⅓⅔⅛]/g, (f) => ` ${FRACTIONS[f]}`).split(/\s+/).filter(Boolean).reduce((sum, part) => {
+export const toNumber = (text) => text.trim().replace(',', '.').replace(/[½¼¾⅓⅔⅛]/g, (f) => ` ${FRACTIONS[f]}`).split(/\s+/).filter(Boolean).reduce((sum, part) => {
   if (part.includes('/')) { const [a, b] = part.split('/').map(Number); return sum + a / b; }
   return sum + Number(part);
 }, 0);
 
 /** Redondea para que se lea natural: 1 lb = 450 g, 2 lb = 900 g, 3 lb = 1,35 kg. */
-function metric(grams) {
+export function metric(grams) {
   const rounded = grams < 250 ? Math.round(grams / 5) * 5 : Math.round(grams / 25) * 25;
   if (rounded < 1000) return { value: String(rounded), unit: 'g' };
   return { value: String(Math.round(grams / 50) / 20).replace('.', ','), unit: 'kg' };

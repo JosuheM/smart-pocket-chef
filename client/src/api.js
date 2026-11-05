@@ -68,11 +68,13 @@ function qs(params) {
   return p.toString();
 }
 
+const diets = (list) => (list && list.length ? list.join(',') : undefined);
+
 export const api = {
-  search: ({ ingredients, mode, sort, category, pantry, offset = 0, limit = 12 }) =>
-    request(`/recipes/search?${qs({ ingredients: ingredients.join(','), mode, sort, category, pantry, offset, limit })}`),
-  explore: ({ q, category, area, offset = 0, limit = 12 }) =>
-    request(`/recipes/explore?${qs({ q, category, area, offset, limit })}`),
+  search: ({ ingredients, mode, sort, category, area, diet, pantry, offset = 0, limit = 12 }) =>
+    request(`/recipes/search?${qs({ ingredients: ingredients.join(','), mode, sort, category, area, diet: diets(diet), pantry, offset, limit })}`),
+  explore: ({ q, category, area, diet, offset = 0, limit = 12 }) =>
+    request(`/recipes/explore?${qs({ q, category, area, diet: diets(diet), offset, limit })}`),
   recipe: (id, have, pantry) => request(`/recipes/${id}?have=${csv(have)}${pantry ? '&pantry=1' : ''}`),
   suggest: (q) => request(`/recipes/ingredients?q=${encodeURIComponent(q)}`),
   meta: () => request('/recipes/meta'),
@@ -81,6 +83,16 @@ export const api = {
   hero: () => request('/recipes/hero'),
   register: (form) => request('/auth/register', { method: 'POST', body: form, auth: false }),
   login: (email, password) => request('/auth/login', { method: 'POST', body: { email, password }, auth: false }),
+  authConfig: () => request('/auth/config', { auth: false }),
+  google: (credential) => request('/auth/google', { method: 'POST', body: { credential }, auth: false }),
+  pantry: () => request('/pantry'),
+  savePantry: (items) => request('/pantry', { method: 'PUT', body: { items } }),
+  pantrySummary: ({ diet, limit = 12, offset = 0 } = {}) => request(`/pantry/summary?${qs({ diet: diets(diet), limit, offset })}`),
+  notes: () => request('/notes'),
+  note: (mealId) => request(`/notes/${mealId}`),
+  saveNote: (mealId, body) => request(`/notes/${mealId}`, { method: 'PUT', body }),
+  planShopping: (meals) => request('/plan/shopping', { method: 'POST', body: { meals } }),
+  shareQr: (url) => request(`/share/qr?${qs({ url })}`),
   me: () => request('/auth/me', { auth: false }),
   favorites: () => request('/favorites'),
   addFavorite: (recipe) => request('/favorites', { method: 'POST', body: recipe }),
