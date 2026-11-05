@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   email         VARCHAR(160) NOT NULL UNIQUE,
   google_id     VARCHAR(40)  NULL UNIQUE,
   password_hash VARCHAR(100) NULL,
+  role          ENUM('user', 'admin') NOT NULL DEFAULT 'user',
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -85,6 +86,11 @@ CREATE TABLE IF NOT EXISTS custom_recipes (
   updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Base de una version anterior: ejecuta solo estas dos lineas (el servidor tambien lo hace al arrancar)
+-- Base de una version anterior: ejecuta solo estas lineas (el servidor tambien lo hace al arrancar)
 --   ALTER TABLE users ADD COLUMN google_id VARCHAR(40) NULL UNIQUE AFTER email;
 --   ALTER TABLE users MODIFY password_hash VARCHAR(100) NULL;
+--   ALTER TABLE users ADD COLUMN role ENUM('user', 'admin') NOT NULL DEFAULT 'user' AFTER password_hash;
+
+-- PRIMER ADMINISTRADOR (Panel de administracion): la persona debe haberse registrado antes.
+-- En phpMyAdmin > tu base > pestana SQL, cambia el correo y ejecuta:
+--   UPDATE users SET role = 'admin' WHERE email = 'correo@ejemplo.com';

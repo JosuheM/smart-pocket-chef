@@ -53,7 +53,7 @@ router.post('/register', wrap(async (req, res) => {
       'INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)',
       [name, email, hash],
     );
-    const user = { id: result.insertId, name, email };
+    const user = { id: result.insertId, name, email, role: 'user' };
     res.status(201).json({ token: signToken(user), user });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') throw new HttpError(409, 'Ya existe una cuenta con ese correo.');
@@ -66,7 +66,7 @@ router.post('/login', wrap(async (req, res) => {
   const password = String(req.body?.password ?? '');
 
   const [rows] = await getPool().execute(
-    'SELECT id, name, email, password_hash FROM users WHERE email = ?',
+    'SELECT id, name, email, role, password_hash FROM users WHERE email = ?',
     [email],
   );
   const user = rows[0];
@@ -74,7 +74,7 @@ router.post('/login', wrap(async (req, res) => {
   const ok = user && (await bcrypt.compare(password, user.password_hash));
   if (!ok) throw new HttpError(401, 'Correo o contraseña incorrectos.');
 
-  res.json({ token: signToken(user), user: { id: user.id, name: user.name, email: user.email } });
+  res.json({ token: signToken(user), user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 }));
 
 // POST /api/auth/google  { credential }  -> valida el token con Google, crea o enlaza la cuenta en MySQL y devuelve el JWT propio
@@ -82,22 +82,22 @@ router.post('/google', wrap(async (req, res) => {
   const google = await verifyGoogleToken(text(req.body?.credential));
   const pool = getPool();
 
-  const [rows] = await pool.execute('SELECT id, name, email, google_id FROM users WHERE google_id = ? OR email = ?', [google.sub, google.email]);
+  const [rows] = await pool.execute('SELECT id, name, email, role, google_id FROM users WHERE google_id = ? OR email = ?', [google.sub, google.email]);
   let user = rows.find((r) => r.google_id === google.sub) ?? rows[0];
   let isNew = false;
 
   if (!user) {
     const [result] = await pool.execute('INSERT INTO users (name, email, google_id, password_hash) VALUES (?, ?, ?, NULL)', [google.name, google.email, google.sub]);
-    user = { id: result.insertId, name: google.name, email: google.email };
+    user = { id: result.insertId, name: google.name, email: google.email, role: 'user' };
     isNew = true;
   } else if (!user.google_id) {
     await pool.execute('UPDATE users SET google_id = ? WHERE id = ?', [google.sub, user.id]); // ya tenía cuenta con ese correo: se enlaza
   }
-  res.status(isNew ? 201 : 200).json({ token: signToken(user), user: { id: user.id, name: user.name, email: user.email }, isNew });
+  res.status(isNew ? 201 : 200).json({ token: signToken(user), user: { id: user.id, name: user.name, email: user.email, role: user.role }, isNew });
 }));
 
 router.get('/me', requireAuth, wrap(async (req, res) => {
-  const [rows] = await getPool().execute('SELECT id, name, email FROM users WHERE id = ?', [req.user.id]);
+  const [rows] = await getPool().execute('SELECT id, name, email, role FROM users WHERE id = ?', [req.user.id]);
   if (!rows[0]) throw new HttpError(401, 'Tu sesión ya no es válida.');
   res.json({ user: rows[0] });
 }));

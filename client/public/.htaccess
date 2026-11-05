@@ -1,0 +1,9 @@
+# Aplicación de una sola página: /admin (y cualquier otra ruta de React) debe abrir index.html al recargar o entrar directo
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>

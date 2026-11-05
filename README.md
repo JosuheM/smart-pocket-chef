@@ -31,6 +31,7 @@ Buscador de recetas por ingredientes y gestor de compras. Aplicación full-stack
 - **Compartir receta:** enlace exacto de la app, QR de QuickChart (con respaldo local), WhatsApp, Telegram, Facebook, correo y el menú del celular.
 - **App instalable (PWA):** `client/public/manifest.json`, iconos y service worker; funciona sin internet con lo que ya viste.
 - **25 platos peruanos en MySQL** (`custom_recipes`), mezclados con TheMealDB sin que la pantalla note la diferencia.
+- **Panel de administración** (`/admin`, solo administradores): estadísticas, lista de usuarios con búsqueda, cambio de rol y eliminación de cuentas con confirmación. Ver [Panel de administración](#panel-de-administración).
 
 ## Requisitos
 
@@ -123,6 +124,10 @@ Para llevar el proyecto a otra computadora sin internet, copia también la carpe
 | GET · PUT | `/api/pantry` | sesión | Despensa (PUT reemplaza la lista completa) |
 | GET | `/api/pantry/summary?diet=gluten` | sesión | "Hoy puedes cocinar X recetas": `{ items, total, almost, results }` |
 | GET · PUT | `/api/notes/:mealId` · GET `/api/notes` | sesión | Nota, calificación (1-5) y `cooked` de una receta; lista de todas |
+| GET | `/api/admin/users?search=&limit=25&offset=0` | **admin** | Usuarios: id, nombre, correo, rol, fecha de registro, si usa Google, despensa y favoritas |
+| PUT | `/api/admin/users/:id/role` `{ role: 'admin' \| 'user' }` | **admin** | Cambia el rol (no el propio; siempre debe quedar un administrador) |
+| DELETE | `/api/admin/users/:id` | **admin** | Elimina la cuenta y, en cascada, su despensa, notas, favoritas e historial |
+| GET | `/api/admin/stats` | **admin** | Totales: usuarios, administradores, despensas, favoritas, notas, listas, recetas propias |
 | GET · POST · DELETE | `/api/favorites` | sesión | Recetas favoritas |
 | GET · DELETE | `/api/shopping/history` | sesión | Historial de listas de compras |
 | GET | `/api/health` | público | Estado del servidor, la base, la traducción y el catálogo |
@@ -142,7 +147,8 @@ smart-pocket-chef/
 │       ├── index.js        servidor Express
 │       ├── config.js, db.js
 │       ├── middleware/     auth, rateLimit
-│       ├── routes/         auth, recipes, favorites, shopping, pantry, notes, plan, share
+│       ├── routes/         auth, recipes, favorites, shopping, pantry, notes, plan, share, adminRoutes
+│       ├── controllers/    adminController
 │       ├── services/       themealdb, catalog, mealdb, customRecipes, unsplash, quickchart, translate
 │       ├── data/           peru.js (25 recetas), peru-photos.js
 │       └── utils/          text, ingredients-es, spanish, units, measures, diet, http
@@ -152,9 +158,34 @@ smart-pocket-chef/
     └── src/
         ├── App.jsx, api.js, hooks.js, styles.css, utils/measures.js
         └── components/     SearchBar, FiltersBar, ResultsToolbar, RecipeGrid, RecipeDrawer, RecipeNotes,
-                            KitchenMode, ShareDialog, PantryView, PlanView, QRModule, ShoppingList, History,
+                            KitchenMode, ShareDialog, PantryView, PlanView, AdminRoute, AdminDashboard, QRModule, ShoppingList, History,
                             AuthDialog, GoogleButton, Stars, Header, Toasts, Footer, EmptyState
 ```
+
+## Panel de administración
+
+**Primer administrador.** Nadie es administrador al inicio (la columna `users.role` se crea sola, con `'user'` para todos). La persona debe registrarse primero; después, una de dos:
+
+```sql
+-- phpMyAdmin (en Hostinger: hPanel > Bases de datos > phpMyAdmin > pestaña SQL)
+UPDATE users SET role = 'admin' WHERE email = 'correo@ejemplo.com';
+```
+
+```bash
+# o con el servidor, en tu computadora: cd server
+npm run make-admin -- correo@ejemplo.com            # volver a usuario normal: agrega --remove
+```
+
+Al volver a ingresar, aparece la pestaña **Admin** y se puede abrir `/admin`.
+
+**Cómo está protegido**
+
+- `verifyAdmin` (`server/src/middleware/auth.js`) va después de `requireAuth` y consulta el rol **en MySQL en cada petición**, no en el token: si alguien deja de ser administrador o se borra su cuenta, pierde el acceso al instante. Sin sesión responde 401; con sesión de usuario normal, 403.
+- Las rutas están en `routes/adminRoutes.js` y la lógica en `controllers/adminController.js`. Los accesos se registran en la consola del servidor (`[admin] usuario 3: cambió el rol de …`).
+- Un administrador no puede cambiar su propio rol ni eliminar su propia cuenta, y nunca puede quedar el sistema sin administradores. La lista nunca devuelve contraseñas.
+- La ruta `/admin` del frontend (`react-router-dom`, `AdminRoute.jsx`) redirige al inicio a quien no sea administrador. Eso solo oculta la pantalla: la seguridad real es la del servidor.
+- `client/public/.htaccess` hace que Hostinger abra la aplicación al entrar directo a `/admin` o recargar esa página.
+- Eliminar una cuenta es definitivo (no hay suspensión): se borran en cascada su despensa, notas, favoritas e historial.
 
 ## Acceso con Google (opcional)
 
