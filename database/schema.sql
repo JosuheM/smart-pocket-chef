@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   email         VARCHAR(160) NOT NULL UNIQUE,
   google_id     VARCHAR(40)  NULL UNIQUE,
   password_hash VARCHAR(100) NULL,
+  role          ENUM('user', 'admin') NOT NULL DEFAULT 'user',
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -88,6 +89,12 @@ CREATE TABLE IF NOT EXISTS custom_recipes (
   updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- ¿Ya tenías la base de una versión anterior? Ejecuta solo estas dos líneas (el servidor también lo hace al arrancar):
+-- ¿Ya tenías la base de una versión anterior? Ejecuta solo estas líneas (el servidor también lo hace al arrancar):
 --   ALTER TABLE users ADD COLUMN google_id VARCHAR(40) NULL UNIQUE AFTER email;
 --   ALTER TABLE users MODIFY password_hash VARCHAR(100) NULL;
+--   ALTER TABLE users ADD COLUMN role ENUM('user', 'admin') NOT NULL DEFAULT 'user' AFTER password_hash;
+
+-- PRIMER ADMINISTRADOR (Panel de administración): la persona debe haberse registrado antes. Cambia el correo y ejecuta:
+--   UPDATE users SET role = 'admin' WHERE email = 'correo@ejemplo.com';
+-- Para quitarle el rol:  UPDATE users SET role = 'user' WHERE email = 'correo@ejemplo.com';
+-- También se puede con el servidor:  cd server && npm run make-admin -- correo@ejemplo.com

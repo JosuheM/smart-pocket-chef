@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
-import { isDbReady } from '../db.js';
+import { getPool, isDbReady } from '../db.js';
 import { HttpError } from '../utils/http.js';
 
 export const signToken = (user) =>
@@ -22,6 +22,21 @@ export function requireAuth(req, res, next) {
   if (!user) return next(new HttpError(401, 'Inicia sesión para continuar.'));
   req.user = user;
   next();
+}
+
+/**
+ * Va DESPUÉS de requireAuth. El rol se consulta en la base en cada petición y no se lee del token: así, si a alguien le
+ * quitan el rol de administrador (o borran su cuenta), pierde el acceso al instante aunque su token siga sin vencer.
+ */
+export async function verifyAdmin(req, res, next) {
+  try {
+    const [rows] = await getPool().execute('SELECT role FROM users WHERE id = ?', [req.user.id]);
+    if (!rows[0]) return next(new HttpError(401, 'Tu sesión ya no es válida.'));
+    if (rows[0].role !== 'admin') return next(new HttpError(403, 'No tienes permiso para entrar a esta sección.'));
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
 
 /** Si hay sesión válida llena req.user; si no, deja pasar como visitante. */

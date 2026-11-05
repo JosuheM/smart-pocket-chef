@@ -18,6 +18,7 @@ const TABLES = [
     email VARCHAR(160) NOT NULL UNIQUE,
     google_id VARCHAR(40) NULL UNIQUE,
     password_hash VARCHAR(100) NULL,
+    role ENUM('user', 'admin') NOT NULL DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE TABLE IF NOT EXISTS favorites (
@@ -90,11 +91,14 @@ const TABLES = [
   )`,
 ];
 
-/** Bases creadas con una versión anterior: agrega el acceso con Google a la tabla de usuarios. */
+/** Bases creadas con una versión anterior: agrega a la tabla de usuarios el acceso con Google y el rol. */
 async function migrate(p) {
   const [cols] = await p.query("SHOW COLUMNS FROM users LIKE 'google_id'");
   if (!cols.length) await p.query('ALTER TABLE users ADD COLUMN google_id VARCHAR(40) NULL UNIQUE AFTER email');
   await p.query('ALTER TABLE users MODIFY password_hash VARCHAR(100) NULL'); // las cuentas de Google no tienen contraseña
+  // Panel de administración: todas las cuentas existentes quedan como 'user'; el primer admin se asigna a mano (npm run make-admin)
+  const [role] = await p.query("SHOW COLUMNS FROM users LIKE 'role'");
+  if (!role.length) await p.query("ALTER TABLE users ADD COLUMN role ENUM('user', 'admin') NOT NULL DEFAULT 'user' AFTER password_hash");
 }
 
 // Tareas que necesitan la base lista (por ejemplo, cargar las recetas propias); también corren si la base conecta más tarde

@@ -356,6 +356,7 @@ main { max-width: 1180px; min-height: 60vh; margin: 0 auto; padding: 0 clamp(1re
   box-shadow: 6px 6px 0 var(--spruce);
   transform: translate(-50%, -50%);
 }
+.dialog { grid-template-columns: minmax(0, 1fr); overflow-wrap: anywhere; } /* un correo largo no debe ensanchar el cuadro */
 .dialog h2 { margin: 0; font-size: 1.7rem; letter-spacing: -0.02em; }
 .auth-form { display: grid; gap: 0.9rem; }
 .field { display: grid; gap: 0.25rem; font-weight: 600; }
@@ -508,6 +509,31 @@ button.star:hover { transform: scale(1.15); }
   .plan-item .btn-link { grid-column: 2; justify-self: start; }
 }
 @media (prefers-reduced-motion: reduce) { .kitchen-progress i { transition: none; } }
+
+/* ---------- Panel de administración ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.btn-danger { background: #ffe3ea; border-color: var(--radish-dark); color: var(--radish-dark); }
+.btn-danger:hover:not(:disabled) { background: var(--radish); color: #fff; }
+.stat-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.9rem; margin: 1.25rem 0 0.5rem; }
+.stat-card { display: grid; gap: 0.1rem; padding: 0.9rem 1.1rem; background: var(--paper); border: 2px solid var(--spruce); border-radius: 12px; box-shadow: 3px 3px 0 var(--spruce); }
+.stat-card strong { font-size: 2rem; line-height: 1.1; letter-spacing: -0.02em; }
+.stat-card span { color: var(--moss); font-size: 0.92rem; font-weight: 600; }
+.admin-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0.5rem 1.5rem; margin: 2rem 0 0.75rem; }
+.admin-head h3 { margin: 0; font-size: 1.4rem; }
+.admin-search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.6rem; }
+.table-wrap { overflow-x: auto; background: var(--paper); border: 2px solid var(--spruce); border-radius: 12px; }
+.admin-table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 0.95rem; }
+.admin-table th, .admin-table td { padding: 0.6rem 0.8rem; text-align: left; vertical-align: middle; }
+.admin-table thead th { background: var(--spruce); color: var(--mint); font-size: 0.85rem; letter-spacing: 0.02em; white-space: nowrap; }
+.admin-table tbody tr + tr > * { border-top: 1px solid var(--line); }
+.admin-table tbody th { font-weight: 700; }
+.admin-table tbody tr:hover { background: var(--lemon-soft); }
+.admin-email { overflow-wrap: anywhere; }
+.admin-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.admin-actions .btn { padding: 0.3rem 0.8rem; font-size: 0.88rem; }
+.role { padding: 0.1rem 0.65rem; background: var(--mint); border: 1px solid var(--line); border-radius: 999px; font-size: 0.82rem; font-weight: 700; white-space: nowrap; }
+.role[data-role='admin'] { background: var(--lemon); border-color: var(--spruce); }
+.admin-confirm { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.6rem; }
 
 /* ---------- Celulares ---------- */
 @media (max-width: 720px) {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { api, getToken, setToken, setUnauthorizedHandler } from './api.js';
 import { useCart, useInstallPrompt, useLocalStorage, useOnline, usePlan, useToasts } from './hooks.js';
 import Header from './components/Header.jsx';
@@ -6,6 +7,8 @@ import SearchBar from './components/SearchBar.jsx';
 import FiltersBar from './components/FiltersBar.jsx';
 import PantryView from './components/PantryView.jsx';
 import PlanView from './components/PlanView.jsx';
+import AdminRoute from './components/AdminRoute.jsx';
+import AdminDashboard from './components/AdminDashboard.jsx';
 import ResultsToolbar from './components/ResultsToolbar.jsx';
 import { RecipeGrid, RecipeSkeletons } from './components/RecipeGrid.jsx';
 import RecipeDrawer from './components/RecipeDrawer.jsx';
@@ -36,6 +39,10 @@ export default function App() {
   if (initial.current === null) initial.current = readUrl();
 
   const [user, setUser] = useState(null);
+  const [sessionLoading, setSessionLoading] = useState(() => Boolean(getToken())); // comprobando la sesión guardada
+  const location = useLocation();
+  const navigate = useNavigate();
+  const onAdminPage = location.pathname === '/admin';
   const [authDialog, setAuthDialog] = useState(null); // null | { notice }
   const [view, setView] = useState('search'); // search | pantry | plan | favorites | list | history
   const [searchMode, setSearchMode] = useState('ingredients'); // ingredients | name
@@ -79,8 +86,17 @@ export default function App() {
       // Solo una respuesta 401 significa "sesión inválida". Si la base o el servidor fallan, la sesión se conserva.
       if (e.status === 401) setToken(null);
       else notify(`${e.message} Tu sesión sigue guardada.`, 'error');
-    });
+    }).finally(() => setSessionLoading(false));
   }, []);
+
+  // Quien intentó entrar a /admin sin ser administrador vuelve al inicio con un aviso
+  useEffect(() => {
+    if (location.state?.denied) {
+      notify('Esa sección es solo para administradores.', 'error');
+      navigate('/', { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   useEffect(() => {
     if (!user) { setFavorites([]); return; }
@@ -155,6 +171,7 @@ export default function App() {
 
   // La URL refleja la búsqueda y la receta abierta, para poder compartirla o recargar la página
   useEffect(() => {
+    if (onAdminPage) return; // en /admin la dirección no cambia
     const p = new URLSearchParams();
     const q = feed?.query;
     if (q?.kind === 'ingredients') p.set('i', q.terms.join(','));
@@ -165,8 +182,8 @@ export default function App() {
     if (q?.area) p.set('a', q.area);
     if (selectedId) p.set('r', selectedId);
     const s = p.toString();
-    history.replaceState(null, '', s ? `?${s}` : location.pathname);
-  }, [feed?.query, selectedId]);
+    history.replaceState(history.state, '', s ? `?${s}` : location.pathname); // se conserva el estado del enrutador
+  }, [feed?.query, selectedId, onAdminPage]);
 
   const searchIngredients = (list) => {
     setIngredients(list);
@@ -250,7 +267,18 @@ export default function App() {
     notify('Cerraste sesión.');
   };
 
-  const goTo = (v) => { setView(v); setError(''); window.scrollTo({ top: 0 }); };
+  const goTo = (v) => {
+    if (onAdminPage) navigate('/'); // desde el panel, cualquier otra pestaña vuelve a la aplicación
+    setView(v);
+    setError('');
+    window.scrollTo({ top: 0 });
+  };
+
+  // El servidor dejó de reconocer al usuario como administrador (le quitaron el rol o venció la sesión)
+  const adminForbidden = useCallback(async () => {
+    try { setUser((await api.me()).user); } catch { /* si falla, la sesión se revisa sola en la próxima petición */ }
+    navigate('/', { replace: true, state: { denied: true } });
+  }, [navigate]);
 
   const favoriteCards = favorites.map((f) => ({ id: f.mealId, name: f.name, image: f.image, category: f.category, area: f.area }));
   const gridProps = { favIds, onOpen: setSelectedId, onToggleFav: toggleFavorite };
@@ -281,8 +309,10 @@ export default function App() {
       <a className="skip" href="#contenido">Saltar al contenido</a>
       <Header
         user={user}
-        view={view}
+        view={onAdminPage ? 'admin' : view}
         onView={goTo}
+        isAdmin={user?.role === 'admin'}
+        onAdmin={() => { navigate('/admin'); window.scrollTo({ top: 0 }); }}
         onLogin={() => openLogin()}
         onLogout={logout}
         listCount={cart.pending.length}
@@ -291,6 +321,18 @@ export default function App() {
         onInstall={install}
       />
 
+      <Routes>
+        <Route
+          path="/admin"
+          element={(
+            <main id="contenido">
+              <AdminRoute user={user} loading={sessionLoading}>
+                <AdminDashboard me={user} notify={notify} onForbidden={adminForbidden} />
+              </AdminRoute>
+            </main>
+          )}
+        />
+        <Route path="*" element={(
       <main id="contenido">
         {!online && (
           <p className="offline" role="status">
@@ -436,6 +478,8 @@ export default function App() {
           <History user={user} onNeedLogin={() => openLogin('Ingresa para ver tu historial de compras.')} notify={notify} />
         )}
       </main>
+        )} />
+      </Routes>
 
       <Footer feedResults={feed?.results} notify={notify} />
 

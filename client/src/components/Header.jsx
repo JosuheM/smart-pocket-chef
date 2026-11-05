@@ -7,7 +7,7 @@ const TABS = [
   ['history', 'Historial'],
 ];
 
-export default function Header({ user, view, onView, onLogin, onLogout, listCount, planCount, canInstall, onInstall }) {
+export default function Header({ user, view, onView, isAdmin, onAdmin, onLogin, onLogout, listCount, planCount, canInstall, onInstall }) {
   const badge = { list: listCount, plan: planCount };
   return (
     <header className="topbar">
@@ -26,6 +26,7 @@ export default function Header({ user, view, onView, onLogin, onLogout, listCoun
             {badge[id] > 0 && <span className="count" aria-label={id === 'plan' ? `${badge[id]} recetas en el plan` : `${badge[id]} por comprar`}>{badge[id]}</span>}
           </button>
         ))}
+        {isAdmin && <button onClick={onAdmin} aria-current={view === 'admin' ? 'page' : undefined}>Admin</button>}
       </nav>
 
       <div className="account">
