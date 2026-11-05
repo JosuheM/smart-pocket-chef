@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { api } from '../api.js';
 import { useModal } from '../hooks.js';
+import GoogleButton from './GoogleButton.jsx';
 
 export default function AuthDialog({ notice, onClose, onAuth }) {
   const [mode, setMode] = useState('login');
@@ -21,6 +22,20 @@ export default function AuthDialog({ notice, onClose, onAuth }) {
     setError('');
     try {
       onAuth(isLogin ? await api.login(form.email, form.password) : await api.register(form), !isLogin);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Google entrega un token firmado; el servidor lo valida y devuelve la sesión propia
+  const googleLogin = async (credential) => {
+    setBusy(true);
+    setError('');
+    try {
+      const data = await api.google(credential);
+      onAuth(data, data.isNew);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -67,6 +82,8 @@ export default function AuthDialog({ notice, onClose, onAuth }) {
             {busy ? 'Un momento…' : isLogin ? 'Ingresar' : 'Crear cuenta'}
           </button>
         </form>
+
+        <GoogleButton onCredential={googleLogin} disabled={busy} />
 
         <p className="auth-switch">
           {isLogin ? '¿Primera vez aquí?' : '¿Ya tienes cuenta?'}{' '}

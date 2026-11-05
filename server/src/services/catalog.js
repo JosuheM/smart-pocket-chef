@@ -6,7 +6,8 @@ import { getJson, lookupMeal, parseMeal } from './themealdb.js';
 import { normalize, stem, stemMatches } from '../utils/text.js';
 import { ingredientEs, isStaple, registerIngredient } from '../utils/ingredients-es.js';
 import { PERU } from '../data/peru.js';
-import { CATEGORIES, categoryEs } from '../utils/spanish.js';
+import { CATEGORIES, areaEs, categoryEs } from '../utils/spanish.js';
+import { dietFlags } from '../utils/diet.js';
 import { peek } from './translate.js';
 
 /**
@@ -27,19 +28,32 @@ let loadedAt = 0;
 let loading = null;
 let partial = false; // true: solo hay recetas propias porque nunca se pudo descargar el catálogo
 let retryAt = 0;
+let base = []; // las recetas de TheMealDB tal como se indexaron (para volver a indexar cuando cambian las propias)
+let indexed = false;
+let custom = PERU; // recetas propias: las de MySQL (custom_recipes) o, sin base de datos, las del archivo data/peru.js
 
 function prepare(meal) {
+  const ingredients = meal.ingredients.map((i) => ({ ...i, stem: stem(i.name), staple: isStaple(i.name) }));
   return {
     ...meal,
     nameKey: normalize(meal.name),
-    ingredients: meal.ingredients.map((i) => ({ ...i, stem: stem(i.name), staple: isStaple(i.name) })),
+    flags: dietFlags(meal.ingredients.map((i) => i.name)), // { gluten, dairy, nuts }: filtros de dieta y alergias
+    ingredients,
   };
+}
+
+/** Cambia las recetas propias (por ejemplo, al leerlas de MySQL) y vuelve a indexar sin descargar nada. */
+export function setCustomRecipes(list) {
+  custom = list;
+  if (indexed) index(base);
 }
 
 function index(list) {
   // TheMealDB no trae comida peruana: las recetas propias se suman al catálogo y se buscan igual.
-  for (const m of PERU) for (const i of m.ingredients) registerIngredient(i.name, i.es);
-  meals = [...list, ...PERU].map(prepare);
+  base = list;
+  indexed = true;
+  for (const m of custom) for (const i of m.ingredients) registerIngredient(i.name, i.es);
+  meals = [...list, ...custom].map(prepare);
   byId = new Map(meals.map((m) => [m.id, m]));
 
   const counts = new Map();
@@ -180,6 +194,9 @@ const card = (m, extra = {}) => ({
 
 const byName = (a, b) => a.name.localeCompare(b.name);
 
+/** País y dieta: `diet` = ['gluten', 'dairy', 'nuts']; una receta pasa solo si no lleva ninguno de esos ingredientes. */
+const allowed = (m, area, diet) => (!area || m.area === area) && !diet.some((d) => m.flags[d]);
+
 function facetsOf(list) {
   const counts = new Map();
   for (const r of list) if (r.category) counts.set(r.category, (counts.get(r.category) ?? 0) + 1);
@@ -192,11 +209,12 @@ function facetsOf(list) {
  * Busca por ingredientes. `groups` = [{ label, stems }]: cada grupo es un ingrediente del usuario con sus
  * equivalencias en inglés. Con `pantry`, sal, pimienta, agua y aceite no cuentan como ingredientes que faltan.
  */
-export function searchMeals({ groups, pantry, mode, category, sort }) {
+export function searchMeals({ groups, pantry, mode, category, sort, area = '', diet = [] }) {
   const active = groups.filter((g) => g.known);
   const scored = [];
 
   for (const m of meals) {
+    if (!allowed(m, area, diet)) continue;
     let used = 0;
     const have = new Set();
     for (const g of active) {
@@ -227,10 +245,10 @@ export function searchMeals({ groups, pantry, mode, category, sort }) {
 }
 
 /** Explora el catálogo por nombre y/o categoría. `tokens` = [[candidatos de la palabra 1], [palabra 2], …]. */
-export function exploreMeals({ tokens = [], category, area }) {
+export function exploreMeals({ tokens = [], category, area, diet = [] }) {
   const scored = [];
   for (const m of meals) {
-    if (area && m.area !== area) continue;
+    if (!allowed(m, area, diet)) continue;
     if (tokens.length) {
       const es = normalize(m.local ? m.name : peek(m.name) ?? '');
       const ok = tokens.every((cands) => cands.some((c) => m.nameKey.includes(c) || (es && es.includes(c))));
@@ -245,6 +263,18 @@ export function exploreMeals({ tokens = [], category, area }) {
 }
 
 export const countByArea = (area) => meals.filter((m) => m.area === area).length;
+
+/** Países del catálogo con su cantidad de recetas, para el selector de nacionalidad. */
+export function listAreas() {
+  const counts = new Map();
+  for (const m of meals) if (m.area && m.area !== 'Unknown') counts.set(m.area, (counts.get(m.area) ?? 0) + 1);
+  return [...counts.entries()]
+    .map(([id, count]) => ({ id, label: areaEs(id), count }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'es'));
+}
+
+/** Qué lleva una receta del catálogo: { gluten, dairy, nuts }. */
+export const mealFlags = (id) => byId.get(String(id))?.flags ?? null;
 
 export function listCategories() {
   const counts = new Map();

@@ -2,8 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config.js';
-import { initDb, isDbReady, keepTryingDb } from './db.js';
+import { initDb, isDbReady, keepTryingDb, onDbReady } from './db.js';
 import { initCatalog, catalogSize } from './services/catalog.js';
+import { syncCustomRecipes } from './services/customRecipes.js';
 import { provider } from './services/translate.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { serviceStatus } from './services/status.js';
@@ -11,6 +12,10 @@ import authRoutes from './routes/auth.js';
 import recipeRoutes from './routes/recipes.js';
 import favoriteRoutes from './routes/favorites.js';
 import shoppingRoutes from './routes/shopping.js';
+import pantryRoutes from './routes/pantry.js';
+import notesRoutes from './routes/notes.js';
+import planRoutes from './routes/plan.js';
+import shareRoutes from './routes/share.js';
 
 const app = express();
 if (config.trustProxy) app.set('trust proxy', 1);
@@ -39,6 +44,10 @@ app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: 'De
 app.use('/api/recipes', rateLimit({ windowMs: 60 * 1000, max: 120 }), recipeRoutes);
 app.use('/api/favorites', favoriteRoutes);
 app.use('/api/shopping', rateLimit({ windowMs: 60 * 1000, max: 60 }), shoppingRoutes);
+app.use('/api/pantry', rateLimit({ windowMs: 60 * 1000, max: 60 }), pantryRoutes);
+app.use('/api/notes', rateLimit({ windowMs: 60 * 1000, max: 90 }), notesRoutes);
+app.use('/api/plan', rateLimit({ windowMs: 60 * 1000, max: 20 }), planRoutes);
+app.use('/api/share', rateLimit({ windowMs: 60 * 1000, max: 60 }), shareRoutes);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
 
 // eslint-disable-next-line no-unused-vars
@@ -57,6 +66,7 @@ app.listen(config.port, () => {
 
 // El catálogo y la base son independientes: el catálogo se lee de inmediato, sin esperar a MySQL.
 initCatalog().catch((err) => console.error(`Error al cargar el catálogo: ${err.message}`));
+onDbReady(syncCustomRecipes); // con MySQL listo, las recetas peruanas salen de la tabla custom_recipes (se siembra sola si está vacía)
 initDb()
   .then(() => { if (!isDbReady()) keepTryingDb(); }) // sin base al arrancar: reintenta cada minuto
   .catch((err) => console.error(`Error al preparar la base: ${err.message}`));

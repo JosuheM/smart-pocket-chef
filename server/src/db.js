@@ -16,7 +16,8 @@ const TABLES = [
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(80) NOT NULL,
     email VARCHAR(160) NOT NULL UNIQUE,
-    password_hash VARCHAR(100) NOT NULL,
+    google_id VARCHAR(40) NULL UNIQUE,
+    password_hash VARCHAR(100) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE TABLE IF NOT EXISTS favorites (
@@ -49,7 +50,56 @@ const TABLES = [
     provider VARCHAR(20) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
+  // Mi despensa: los ingredientes que la persona tiene en casa
+  `CREATE TABLE IF NOT EXISTS user_pantry (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    ingredient VARCHAR(80) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_user_ingredient (user_id, ingredient),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+  // Nota personal, calificación (1 a 5) y "ya la cociné" de cada receta
+  `CREATE TABLE IF NOT EXISTS recipe_notes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    meal_id VARCHAR(20) NOT NULL,
+    name VARCHAR(160) NULL,
+    image VARCHAR(500) NULL,
+    note TEXT NULL,
+    rating TINYINT NULL,
+    cooked TINYINT(1) NOT NULL DEFAULT 0,
+    cooked_at TIMESTAMP NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_user_recipe (user_id, meal_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+  // Recetas propias (comida peruana): el buscador las suma a las de TheMealDB
+  `CREATE TABLE IF NOT EXISTS custom_recipes (
+    id VARCHAR(20) PRIMARY KEY,
+    name VARCHAR(160) NOT NULL,
+    name_en VARCHAR(160) NOT NULL,
+    category VARCHAR(80) NOT NULL,
+    area VARCHAR(80) NOT NULL DEFAULT 'Peruvian',
+    photo_query VARCHAR(160) NULL,
+    picture TEXT NULL,
+    ingredients LONGTEXT NOT NULL,
+    steps LONGTEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )`,
 ];
+
+/** Bases creadas con una versión anterior: agrega el acceso con Google a la tabla de usuarios. */
+async function migrate(p) {
+  const [cols] = await p.query("SHOW COLUMNS FROM users LIKE 'google_id'");
+  if (!cols.length) await p.query('ALTER TABLE users ADD COLUMN google_id VARCHAR(40) NULL UNIQUE AFTER email');
+  await p.query('ALTER TABLE users MODIFY password_hash VARCHAR(100) NULL'); // las cuentas de Google no tienen contraseña
+}
+
+// Tareas que necesitan la base lista (por ejemplo, cargar las recetas propias); también corren si la base conecta más tarde
+const readyHooks = [];
+export const onDbReady = (fn) => { readyHooks.push(fn); };
 
 /**
  * Conecta con la base y crea las tablas que falten. Si MySQL no responde, el buscador sigue funcionando sin cuentas.
@@ -79,8 +129,12 @@ export async function initDb({ quiet = false } = {}) {
     }
 
     for (const sql of TABLES) await p.query(sql);
+    await migrate(p);
     pool = p;
     console.log(`MySQL conectado (base "${name}").`);
+    for (const hook of readyHooks) {
+      Promise.resolve().then(hook).catch((err) => console.warn(`Tarea posterior a la conexión con MySQL: ${err.message}`));
+    }
   } catch (err) {
     if (quiet) return;
     console.warn(`No se pudo conectar a MySQL: ${err.code ? `${err.code} ` : ''}${err.message}`);

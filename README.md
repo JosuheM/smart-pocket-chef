@@ -16,8 +16,21 @@ Buscador de recetas por ingredientes y gestor de compras. Aplicación full-stack
 - Avisa qué ingredientes no reconoció en vez de devolver una lista vacía.
 - Panel de receta: ingredientes separados en "ya los tienes" y "te falta comprar", pasos que se marcan como hechos, video y enlace para compartir.
 - **Mi lista de compras:** junta los ingredientes de varias recetas (suma medidas repetidas) y genera un QR con lo pendiente. Compartir por WhatsApp, copiar o descargar el QR.
-- Cuentas, favoritas e historial de listas (MySQL).
+- Cuentas (correo o **Google**), favoritas e historial de listas (MySQL).
 - Recetas traducidas al español, con la URL compartible (`?i=pollo,ajo`, `?r=52772`).
+
+**Funciones de la segunda versión**
+
+- **Mi despensa** (cuenta): guarda lo que tienes en casa en MySQL (`user_pantry`) y muestra "Hoy puedes cocinar X recetas con lo que tienes" (recetas sin ningún ingrediente faltante; sal, pimienta, agua y aceite no cuentan), más cuántas te faltan por 1 o 2 ingredientes.
+- **Notas, calificación y "ya la cociné"** en cada receta (`recipe_notes`): una nota personal, de 1 a 5 estrellas y la marca de cocinada.
+- **Plan semanal:** de 3 a 7 recetas, cada una para 2, 4 o 6 personas. Se junta todo en una sola lista (las medidas iguales se suman: `200 g + 300 g = 500 g`) y se pide **un solo QR** a QuickChart.
+- **Porciones:** selector de 2, 4 o 6 personas en la receta; las cantidades se multiplican al instante en el navegador (`client/src/utils/measures.js`). Las recetas base son para 2 personas.
+- **Unidades métricas:** las libras y onzas pasan a gramos/kilos/mililitros y los °F a °C, tanto en los ingredientes como en los pasos (`server/src/utils/units.js`). Si el valor métrico ya viene al lado (`175g/6oz`, `200°C (400°F)`), solo se quita la parte inglesa.
+- **Filtro por país** (cocina de origen) y **filtros de dieta y alergias** (sin gluten, sin lácteos, sin frutos secos). La dieta revisa los ingredientes de cada receta con listas de palabras (`server/src/utils/diet.js`: harina, pan, leche, queso, maní…) y no depende de las categorías de TheMealDB. Es una ayuda orientativa; cada receta muestra "Contiene: …".
+- **Modo cocina:** pantalla completa (Fullscreen API) y pantalla siempre encendida (Wake Lock API), un paso a la vez con letra grande, temporizadores detectados en el texto ("20 minutos", "1 a 2 horas", "media hora") y lectura en voz alta con `speechSynthesis`, sin servicios de pago.
+- **Compartir receta:** enlace exacto de la app, QR de QuickChart (con respaldo local), WhatsApp, Telegram, Facebook, correo y el menú del celular.
+- **App instalable (PWA):** `client/public/manifest.json`, iconos y service worker; funciona sin internet con lo que ya viste.
+- **25 platos peruanos en MySQL** (`custom_recipes`), mezclados con TheMealDB sin que la pantalla note la diferencia.
 
 ## Requisitos
 
@@ -55,7 +68,8 @@ Al arrancar también crea la base `smart_pocket_chef` y sus tablas. Si prefieres
 
 Notas importantes:
 
-- **Comida peruana.** TheMealDB no trae ningún plato del Perú (tampoco de Chile, Colombia o Argentina), y no encontramos una API gratuita con recetas peruanas. Por eso el backend incluye 20 recetas propias en `server/src/data/peru.js`: se suman al catálogo, salen en la búsqueda por ingredientes (`ají amarillo`, `rocoto`…) y tienen su acceso "Comida peruana" en el inicio. Cada plato tiene una foto fija de Unsplash elegida a mano en `server/src/data/peru-photos.js`, con crédito al autor; así no se gasta la cuota de la API al mostrarlos. Algunas son aproximadas (picarones, mazamorra morada y sopa criolla no tienen una foto exacta en Unsplash).
+- **Comida peruana.** TheMealDB no trae ningún plato del Perú (tampoco de Chile, Colombia o Argentina), y no encontramos una API gratuita con recetas peruanas. Por eso hay 25 recetas propias. La fuente es `server/src/data/peru.js`; al arrancar con MySQL, el servidor las **siembra en la tabla `custom_recipes`** (solo agrega las que faltan, así lo que edites en la base no se pisa; `npm run seed -- --force` las actualiza desde el archivo) y el catálogo las lee de ahí. Se suman a las de TheMealDB, salen en la búsqueda por ingredientes (`ají amarillo`, `rocoto`…) y tienen su acceso "Comida peruana" en el inicio. Si MySQL no responde, el catálogo usa el mismo archivo como copia de seguridad. Los 20 primeros platos tienen una foto fija de Unsplash elegida a mano en `server/src/data/peru-photos.js`, con crédito al autor; los 5 nuevos buscan su foto en Unsplash por nombre (y muestran un degradado si no hay cuota). Algunas fotos son aproximadas (picarones, mazamorra morada y sopa criolla no tienen una foto exacta).
+- **País y TheMealDB.** El catálogo local ya guarda el país de cada receta (`strArea`), por eso el selector de país filtra al instante y también sin internet. Si el catálogo completo aún no se descargó, el país se consulta directo a TheMealDB con `filter.php?a={país}` (`services/themealdb.js`, `filterByArea`).
 
 - **Búsqueda con varios ingredientes.** La clave gratuita de TheMealDB solo filtra por *un* ingrediente a la vez (el filtro múltiple es de pago). Por eso el backend guarda el catálogo (~790 recetas) en memoria y hace el cruce de ingredientes localmente (`catalog.js`). `utils/text.js` decide si "chicken" coincide con "Chicken Breast" pero no "milk" con "Coconut Milk".
 - **Traducción al español.** TheMealDB solo trae recetas en inglés. Los ingredientes comunes salen de un diccionario propio (`utils/ingredients-es.js`, sin gastar cuota); nombres y pasos se traducen con **MyMemory** (gratis; 5,000 caracteres/día, 50,000 con un correo válido en `MYMEMORY_EMAIL`) o **DeepL** si defines `DEEPL_API_KEY` (plan gratuito de unos 500,000 caracteres al mes, cifra a confirmar en su cuenta, y mejor calidad). Cada traducción se guarda en la tabla `translations` de MySQL, así que se traduce una sola vez aunque reinicies. Si el servicio falla se muestra el texto en inglés. `TRANSLATE=false` la desactiva.
@@ -74,8 +88,10 @@ Cada servicio externo tiene un respaldo, y el panel **Estado de los servicios y 
 | **QuickChart** | El navegador genera el QR por su cuenta (paquete `qrcode`) y avisa que es local. |
 | **Traducción (MyMemory/DeepL)** | Se muestran las traducciones ya guardadas en MySQL; lo demás, en inglés. |
 | **MySQL** | Todo funciona menos cuentas, favoritas e historial. La lista de compras vive en el navegador. |
-| **Internet y no hay copia del catálogo** | La app arranca con las 20 recetas peruanas, avisa que el catálogo está incompleto y reintenta cada minuto. |
+| **Internet y no hay copia del catálogo** | La app arranca con las 25 recetas peruanas, avisa que el catálogo está incompleto y reintenta cada minuto. |
 | **Fotos y QR ya vistos** | Un service worker (`client/public/sw.js`) los guarda en el navegador y los muestra sin conexión. |
+| **Google (acceso)** | Si el servidor no tiene `GOOGLE_CLIENT_ID` o el script de Google no carga, el botón no aparece y se puede ingresar con correo. |
+| **Voz, pantalla encendida o pantalla completa** | Si el navegador no las trae (por ejemplo, la voz en algunos Firefox), el modo cocina funciona igual y lo avisa. |
 
 **Antes de exponer** (con internet, una sola vez):
 
@@ -91,15 +107,22 @@ Para llevar el proyecto a otra computadora sin internet, copia también la carpe
 
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
-| GET | `/api/recipes/search?ingredients=pollo,ajo&mode=all&sort=missing&category=Chicken&pantry=1&limit=12&offset=0` | público | Recetas que coinciden, con paginación y categorías |
-| GET | `/api/recipes/explore?q=lasaña&category=Pasta` | público | Por nombre y/o categoría |
-| GET | `/api/recipes/peru` · `/explore?area=Peruvian` | público | Platos de la cocina peruana (20 recetas propias, `server/src/data/peru.js`) |
+| GET | `/api/recipes/search?ingredients=pollo,ajo&mode=all&sort=missing&category=Chicken&area=Italian&diet=gluten,dairy&pantry=1&limit=12&offset=0` | público | Recetas que coinciden, con paginación, categorías, país y dieta (`diet` = recetas SIN `gluten`, `dairy`, `nuts`) |
+| GET | `/api/recipes/explore?q=lasaña&category=Pasta&area=Italian&diet=nuts` | público | Por nombre, categoría, país y/o dieta |
+| GET | `/api/recipes/peru` · `/explore?area=Peruvian` | público | Platos de la cocina peruana (25 recetas propias, tabla `custom_recipes`) |
 | GET | `/api/recipes/ingredients?q=tom` | público | Autocompletado de ingredientes |
-| GET | `/api/recipes/meta` · `/random` · `/hero` | público | Categorías, receta al azar, foto de portada |
-| GET | `/api/recipes/:id?have=pollo,ajo&pantry=1` | público | Receta completa con cada ingrediente marcado como `have` |
+| GET | `/api/recipes/meta` · `/random` · `/hero` | público | Categorías, países, receta al azar, foto de portada |
+| GET | `/api/recipes/:id?have=pollo,ajo&pantry=1` | público | Receta completa con cada ingrediente marcado como `have` y la lista `allergens` |
 | POST | `/api/shopping/qr` | público (guarda historial si hay sesión) | Limpia la lista y devuelve `{ text, qrUrl, omitted }` |
+| POST | `/api/plan/shopping` `{ meals: [{ id, servings }] }` | público (guarda historial si hay sesión) | Plan semanal (3 a 7 recetas): una sola lista con medidas sumadas y un solo QR |
+| GET | `/api/share/qr?url=` | público | QR de QuickChart para un enlace de la propia app (otros sitios se rechazan) |
 | POST | `/api/auth/register` · `/api/auth/login` | público | Cuenta y sesión (JWT, 7 días) |
+| POST | `/api/auth/google` `{ credential }` | público | Valida el token de Google (`aud` = `GOOGLE_CLIENT_ID`), crea o enlaza la cuenta y devuelve el JWT |
+| GET | `/api/auth/config` | público | `{ googleClientId }` para que el frontend dibuje el botón de Google |
 | GET | `/api/auth/me` | sesión | Usuario actual |
+| GET · PUT | `/api/pantry` | sesión | Despensa (PUT reemplaza la lista completa) |
+| GET | `/api/pantry/summary?diet=gluten` | sesión | "Hoy puedes cocinar X recetas": `{ items, total, almost, results }` |
+| GET · PUT | `/api/notes/:mealId` · GET `/api/notes` | sesión | Nota, calificación (1-5) y `cooked` de una receta; lista de todas |
 | GET · POST · DELETE | `/api/favorites` | sesión | Recetas favoritas |
 | GET · DELETE | `/api/shopping/history` | sesión | Historial de listas de compras |
 | GET | `/api/health` | público | Estado del servidor, la base, la traducción y el catálogo |
@@ -109,24 +132,38 @@ Para llevar el proyecto a otra computadora sin internet, copia también la carpe
 
 ```
 smart-pocket-chef/
-├── database/schema.sql
+├── database/               schema.sql (XAMPP) y schema_hostinger.sql
 ├── server/
 │   ├── .env.example
-│   ├── data/               catálogo local de TheMealDB (se crea solo, fuera de git)
+│   ├── data/               catálogo local de TheMealDB (se crea solo)
+│   ├── scripts/            warmup.js, seed-peru.js (npm run seed)
+│   ├── test/               pruebas con node:test (npm test)
 │   └── src/
 │       ├── index.js        servidor Express
 │       ├── config.js, db.js
 │       ├── middleware/     auth, rateLimit
-│       ├── routes/         auth, recipes, favorites, shopping
-│       ├── services/       themealdb, catalog, mealdb, unsplash, quickchart, translate
-│       └── utils/          text, ingredients-es, spanish, http
+│       ├── routes/         auth, recipes, favorites, shopping, pantry, notes, plan, share
+│       ├── services/       themealdb, catalog, mealdb, customRecipes, unsplash, quickchart, translate
+│       ├── data/           peru.js (25 recetas), peru-photos.js
+│       └── utils/          text, ingredients-es, spanish, units, measures, diet, http
 └── client/
     ├── index.html, vite.config.js
+    ├── public/             sw.js, manifest.json, icons/
     └── src/
-        ├── App.jsx, api.js, hooks.js, styles.css
-        └── components/     SearchBar, ResultsToolbar, RecipeGrid, RecipeDrawer, QRModule,
-                            ShoppingList, History, AuthDialog, Header, Toasts, Footer, EmptyState
+        ├── App.jsx, api.js, hooks.js, styles.css, utils/measures.js
+        └── components/     SearchBar, FiltersBar, ResultsToolbar, RecipeGrid, RecipeDrawer, RecipeNotes,
+                            KitchenMode, ShareDialog, PantryView, PlanView, QRModule, ShoppingList, History,
+                            AuthDialog, GoogleButton, Stars, Header, Toasts, Footer, EmptyState
 ```
+
+## Acceso con Google (opcional)
+
+1. En [Google Cloud Console](https://console.cloud.google.com/) crea un proyecto, configura la pantalla de consentimiento (tipo Externo) y ve a **APIs y servicios → Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web**.
+2. En **Orígenes de JavaScript autorizados** agrega la URL del frontend (`http://localhost:5173` y la de producción). No hace falta URI de redirección.
+3. Copia el **ID de cliente** (termina en `.apps.googleusercontent.com`; no es secreto) y ponlo en `GOOGLE_CLIENT_ID` del backend. No uses el "secreto de cliente": esta app no lo necesita.
+4. Reinicia el backend. El botón "Continuar con Google" aparece solo; el frontend lee el ID desde `/api/auth/config`, así que no hay que recompilarlo.
+
+El servidor valida el token con Google (`oauth2.googleapis.com/tokeninfo`), exige que `aud` sea su propio ID de cliente, que el correo esté verificado y que no haya vencido; luego crea o enlaza la cuenta en `users` y entrega su propio JWT.
 
 ## Seguridad
 

@@ -1,0 +1,19 @@
+{
+  "name": "Smart Pocket Chef",
+  "short_name": "Pocket Chef",
+  "description": "Busca recetas con los ingredientes que tienes, planifica tu semana y llévate la lista de compras al celular con un código QR.",
+  "lang": "es",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#e7f0ea",
+  "theme_color": "#14302b",
+  "categories": ["food", "lifestyle"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

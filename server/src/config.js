@@ -13,6 +13,8 @@ export const config = {
   clientOrigin: (process.env.CLIENT_ORIGIN || 'http://localhost:5173').split(',').map((s) => s.trim()),
   trustProxy: process.env.TRUST_PROXY === 'true', // true detrás de Render, Railway, Hostinger, etc.
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-cambialo',
+  // ID de cliente de Google (Google Cloud Console > Credenciales). Sin él, el botón "Continuar con Google" no aparece.
+  googleClientId: process.env.GOOGLE_CLIENT_ID || '',
   unsplashKey: process.env.UNSPLASH_ACCESS_KEY || '',
   // true: la foto del detalle de la receta sale de Unsplash (si falla, de TheMealDB). Las tarjetas usan TheMealDB.
   preferUnsplash: process.env.PREFER_UNSPLASH === 'true',
