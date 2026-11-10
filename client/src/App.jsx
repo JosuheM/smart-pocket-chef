@@ -17,7 +17,6 @@ import AuthDialog from './components/AuthDialog.jsx';
 import History from './components/History.jsx';
 import EmptyState from './components/EmptyState.jsx';
 import Toasts from './components/Toasts.jsx';
-import Footer from './components/Footer.jsx';
 
 const MAX_TERMS = 10;
 
@@ -480,8 +479,6 @@ export default function App() {
       </main>
         )} />
       </Routes>
-
-      <Footer />
 
       {selectedId && (
         <RecipeDrawer
