@@ -44,7 +44,7 @@ export default function PantryView({ user, diet, searchTerms, favIds, onOpen, on
       .then((d) => { if (alive) { setItems(d.items); setLoaded(true); } })
       .catch((e) => alive && e.status !== 401 && setError(e.message));
     api.notes()
-      .then((list) => alive && setCooked(list.filter((n) => n.cooked || n.rating || n.note)))
+      .then((list) => alive && setCooked(list.filter((n) => n.cooked || n.rating)))
       .catch(() => {});
     return () => { alive = false; };
   }, [user]);
@@ -200,14 +200,13 @@ export default function PantryView({ user, diet, searchTerms, favIds, onOpen, on
 
       {cooked.length > 0 && (
         <>
-          <h3 className="section-title">Mis notas y recetas cocinadas</h3>
+          <h3 className="section-title">Mis recetas cocinadas y calificadas</h3>
           <ul className="cooked">
             {cooked.slice(0, 12).map((n) => (
               <li key={n.mealId}>
                 <button className="cooked-open" onClick={() => onOpen(n.mealId)}>
                   <span className="cooked-name">{n.name || `Receta ${n.mealId}`}{n.cooked && <em className="badge">Cocinada</em>}</span>
                   {n.rating && <Stars value={n.rating} readOnly />}
-                  {n.note && <small className="muted">“{n.note.length > 90 ? `${n.note.slice(0, 90)}…` : n.note}”</small>}
                 </button>
               </li>
             ))}

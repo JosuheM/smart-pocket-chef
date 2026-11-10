@@ -15,7 +15,7 @@ const CARDS = [
   ['pantryItems', 'Ingredientes en despensas'],
   ['favorites', 'Recetas favoritas'],
   ['cooked', 'Recetas cocinadas'],
-  ['notes', 'Notas y calificaciones'],
+  ['notes', 'Calificaciones'],
   ['shoppingLists', 'Listas de compras'],
   ['customRecipes', 'Recetas propias (Perú)'],
   ['userRecipes', 'Recetas creadas por usuarios'],
@@ -211,7 +211,7 @@ export default function AdminDashboard({ me, notify, onForbidden }) {
           onCancel={() => setToDelete(null)}
           onConfirm={confirmDelete}
         >
-          Vas a eliminar a <strong>{toDelete.name}</strong> ({toDelete.email}). Se borrarán también sus favoritas, su despensa, sus notas y su historial de compras.
+          Vas a eliminar a <strong>{toDelete.name}</strong> ({toDelete.email}). Se borrarán también sus favoritas, su despensa, sus calificaciones y su historial de compras.
           <strong> Esta acción no se puede deshacer.</strong>
         </ConfirmDialog>
       )}

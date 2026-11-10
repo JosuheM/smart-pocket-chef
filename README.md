@@ -22,7 +22,7 @@ Buscador de recetas por ingredientes y gestor de compras. Aplicación full-stack
 **Funciones de la segunda versión**
 
 - **Mi despensa** (cuenta): guarda lo que tienes en casa en MySQL (`user_pantry`) y muestra "Hoy puedes cocinar X recetas con lo que tienes" (recetas sin ningún ingrediente faltante; sal, pimienta, agua y aceite no cuentan), más cuántas te faltan por 1 o 2 ingredientes.
-- **Notas, calificación y "ya la cociné"** en cada receta (`recipe_notes`): una nota personal, de 1 a 5 estrellas y la marca de cocinada.
+- **Calificación y "ya la cociné"** en cada receta (`recipe_notes`): de 1 a 5 estrellas y la marca de cocinada. (La tabla y la API conservan el campo `note` por compatibilidad, pero la pantalla ya no ofrece escribir notas.)
 - **Plan semanal:** de 3 a 7 recetas, cada una para 2, 4 o 6 personas. Se junta todo en una sola lista (las medidas iguales se suman: `200 g + 300 g = 500 g`) y se pide **un solo QR** a QuickChart.
 - **Porciones:** selector de 2, 4 o 6 personas en la receta; las cantidades se multiplican al instante en el navegador (`client/src/utils/measures.js`). Las recetas base son para 2 personas.
 - **Unidades métricas:** las libras y onzas pasan a gramos/kilos/mililitros y los °F a °C, tanto en los ingredientes como en los pasos (`server/src/utils/units.js`). Si el valor métrico ya viene al lado (`175g/6oz`, `200°C (400°F)`), solo se quita la parte inglesa.

@@ -140,7 +140,7 @@ export default function AdminRecipes({ notify, onForbidden, onChanged }) {
           onCancel={() => setToDelete(null)}
           onConfirm={confirmDelete}
         >
-          Vas a borrar <strong>{toDelete.name}</strong>. Desaparece del buscador y también de las favoritas y notas de quienes la guardaron.
+          Vas a borrar <strong>{toDelete.name}</strong>. Desaparece del buscador y también de las favoritas y calificaciones de quienes la guardaron.
           <strong> Esta acción no se puede deshacer.</strong>
         </ConfirmDialog>
       )}

@@ -146,7 +146,7 @@ export default function MyRecipes({ user, onNeedLogin, onOpen, notify }) {
           onCancel={() => setToDelete(null)}
           onConfirm={confirmDelete}
         >
-          Vas a borrar <strong>{toDelete.name}</strong>. También se quita de tus favoritas y notas.
+          Vas a borrar <strong>{toDelete.name}</strong>. También se quita de tus favoritas y calificaciones.
           <strong> Esta acción no se puede deshacer.</strong>
         </ConfirmDialog>
       )}
