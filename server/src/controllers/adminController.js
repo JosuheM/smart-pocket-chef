@@ -101,7 +101,8 @@ export async function getStats(req, res) {
        (SELECT COUNT(*) FROM recipe_notes) AS notes,
        (SELECT COUNT(*) FROM recipe_notes WHERE cooked = 1) AS cooked,
        (SELECT COUNT(*) FROM shopping_lists) AS shopping_lists,
-       (SELECT COUNT(*) FROM custom_recipes) AS custom_recipes`,
+       (SELECT COUNT(*) FROM custom_recipes) AS custom_recipes,
+       (SELECT COUNT(*) FROM user_recipes) AS user_recipes`,
   );
   res.json({
     users: s.users,
@@ -115,5 +116,6 @@ export async function getStats(req, res) {
     cooked: s.cooked,
     shoppingLists: s.shopping_lists,
     customRecipes: s.custom_recipes,
+    userRecipes: s.user_recipes,
   });
 }

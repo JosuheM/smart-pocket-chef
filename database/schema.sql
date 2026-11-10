@@ -74,6 +74,30 @@ CREATE TABLE IF NOT EXISTS recipe_notes (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Recuperar contraseña: solo se guarda el hash (SHA-256) del enlace enviado por correo; vence en 1 hora y sirve una vez
+CREATE TABLE IF NOT EXISTS password_resets (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT      NOT NULL,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  expires_at DATETIME NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Recetas que cada persona crea para sí misma (solo su dueña o dueño las ve)
+CREATE TABLE IF NOT EXISTS user_recipes (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT          NOT NULL,
+  name        VARCHAR(160) NOT NULL,
+  category    VARCHAR(80)  NOT NULL,
+  ingredients LONGTEXT     NOT NULL,   -- JSON: [{ "name": "chicken", "es": "Pollo", "measure": "1 presa" }]
+  steps       LONGTEXT     NOT NULL,   -- JSON: ["Paso 1…", "Paso 2…"]
+  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_user_recipes_user (user_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Recetas propias (comida peruana). El servidor las siembra solo al arrancar; también: npm run seed
 CREATE TABLE IF NOT EXISTS custom_recipes (
   id          VARCHAR(20)  PRIMARY KEY,

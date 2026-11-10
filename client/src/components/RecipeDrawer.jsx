@@ -171,7 +171,7 @@ export default function RecipeDrawer({ id, haveTerms, pantry, user, diet, plan, 
                   <button className="btn" aria-pressed={plan.has(recipe.id)} onClick={addToPlan} disabled={plan.has(recipe.id)}>
                     {plan.has(recipe.id) ? 'En el plan semanal' : 'Agregar al plan semanal'}
                   </button>
-                  <button className="btn" onClick={() => setSharing(true)}>Compartir</button>
+                  {!recipe.mine && <button className="btn" onClick={() => setSharing(true)}>Compartir</button>}
                   {recipe.youtube && <a className="btn" href={recipe.youtube} target="_blank" rel="noreferrer">Ver video</a>}
                 </div>
 

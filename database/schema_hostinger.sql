@@ -71,6 +71,30 @@ CREATE TABLE IF NOT EXISTS recipe_notes (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- Recuperar contrasena: solo se guarda el hash del enlace enviado por correo
+CREATE TABLE IF NOT EXISTS password_resets (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT      NOT NULL,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  expires_at DATETIME NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Recetas que cada persona crea para si misma
+CREATE TABLE IF NOT EXISTS user_recipes (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT          NOT NULL,
+  name        VARCHAR(160) NOT NULL,
+  category    VARCHAR(80)  NOT NULL,
+  ingredients LONGTEXT     NOT NULL,
+  steps       LONGTEXT     NOT NULL,
+  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_user_recipes_user (user_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- Recetas propias (comida peruana): el servidor las siembra solo al arrancar si la tabla esta vacia
 CREATE TABLE IF NOT EXISTS custom_recipes (
   id          VARCHAR(20)  PRIMARY KEY,

@@ -2,6 +2,7 @@ const TABS = [
   ['search', 'Buscar'],
   ['pantry', 'Despensa'],
   ['plan', 'Plan semanal'],
+  ['mine', 'Mis recetas'],
   ['favorites', 'Favoritas'],
   ['list', 'Mi lista'],
   ['history', 'Historial'],

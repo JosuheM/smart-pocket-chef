@@ -54,6 +54,7 @@ router.get('/summary', wrap(async (req, res) => {
   const items = await readPantry(req.user.id);
   const summary = await pantryOverview(items, {
     diet: parseDiet(req.query.diet),
+    userId: req.user.id,
     limit: clampInt(req.query.limit, 12, 1, 24),
     offset: clampInt(req.query.offset, 0, 0, 2000),
   });

@@ -75,6 +75,28 @@ const TABLES = [
     UNIQUE KEY uq_user_recipe (user_id, meal_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`,
+  // Recuperar contraseña: solo se guarda el hash del enlace enviado por correo (un token de un solo uso que vence en 1 hora)
+  `CREATE TABLE IF NOT EXISTS password_resets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+  // Recetas que cada persona crea para sí misma: nadie más las ve
+  `CREATE TABLE IF NOT EXISTS user_recipes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    name VARCHAR(160) NOT NULL,
+    category VARCHAR(80) NOT NULL,
+    ingredients LONGTEXT NOT NULL,
+    steps LONGTEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_user_recipes_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
   // Recetas propias (comida peruana): el buscador las suma a las de TheMealDB
   `CREATE TABLE IF NOT EXISTS custom_recipes (
     id VARCHAR(20) PRIMARY KEY,

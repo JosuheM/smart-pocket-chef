@@ -31,6 +31,8 @@ Buscador de recetas por ingredientes y gestor de compras. Aplicación full-stack
 - **Compartir receta:** enlace exacto de la app, QR de QuickChart (con respaldo local), WhatsApp, Telegram, Facebook, correo y el menú del celular.
 - **App instalable (PWA):** `client/public/manifest.json`, iconos y service worker; funciona sin internet con lo que ya viste.
 - **25 platos peruanos en MySQL** (`custom_recipes`), mezclados con TheMealDB sin que la pantalla note la diferencia.
+- **Mis recetas:** cada persona crea sus propios platos (hasta 50), que **solo ella ve**. Salen en sus búsquedas (por ingredientes y por nombre), en su despensa y en su plan semanal, y se pueden marcar como favoritas, calificar y cocinar con el modo cocina. No llevan foto.
+- **Recuperar cuenta:** "¿Olvidaste tu contraseña?" manda por correo un enlace de un solo uso que vence en 1 hora. Ver [Recuperar contraseña](#recuperar-contraseña-por-correo).
 - **Panel de administración** (`/admin`, solo administradores): estadísticas, lista de usuarios con búsqueda, cambio de rol y eliminación de cuentas con confirmación, y **gestión de las recetas peruanas** (agregar, corregir y borrar platos). Ver [Panel de administración](#panel-de-administración).
 
 ## Requisitos
@@ -120,6 +122,10 @@ Para llevar el proyecto a otra computadora sin internet, copia también la carpe
 | POST | `/api/auth/register` · `/api/auth/login` | público | Cuenta y sesión (JWT, 7 días) |
 | POST | `/api/auth/google` `{ credential }` | público | Valida el token de Google (`aud` = `GOOGLE_CLIENT_ID`), crea o enlaza la cuenta y devuelve el JWT |
 | GET | `/api/auth/config` | público | `{ googleClientId }` para que el frontend dibuje el botón de Google |
+| POST | `/api/auth/forgot` `{ email }` | público | Manda el enlace de recuperación (siempre responde igual, exista o no la cuenta; máx. 6 por hora y por IP) |
+| POST | `/api/auth/reset` `{ token, password }` | público | Con el enlace del correo pone la contraseña nueva y abre la sesión |
+| GET · POST | `/api/my/recipes` | sesión | Mis recetas (lista, hasta 50) / crear una |
+| GET · PUT · DELETE | `/api/my/recipes/:id` · GET `/:id/edit` | sesión | Detalle, edición y borrado de una receta mía; las ajenas responden 404 |
 | GET | `/api/auth/me` | sesión | Usuario actual |
 | GET · PUT | `/api/pantry` | sesión | Despensa (PUT reemplaza la lista completa) |
 | GET | `/api/pantry/summary?diet=gluten` | sesión | "Hoy puedes cocinar X recetas": `{ items, total, almost, results }` |
@@ -149,9 +155,9 @@ smart-pocket-chef/
 │       ├── index.js        servidor Express
 │       ├── config.js, db.js
 │       ├── middleware/     auth, rateLimit
-│       ├── routes/         auth, recipes, favorites, shopping, pantry, notes, plan, share, adminRoutes
-│       ├── controllers/    adminController, adminRecipesController
-│       ├── services/       themealdb, catalog, mealdb, customRecipes, unsplash, quickchart, translate
+│       ├── routes/         auth, recipes, favorites, shopping, pantry, notes, plan, share, myRecipes, adminRoutes
+│       ├── controllers/    adminController, adminRecipesController, myRecipesController
+│       ├── services/       themealdb, catalog, mealdb, customRecipes, userRecipes, mailer, unsplash, quickchart, translate
 │       ├── data/           peru.js (25 recetas), peru-photos.js
 │       └── utils/          text, ingredients-es, spanish, units, measures, diet, http
 └── client/
@@ -160,7 +166,7 @@ smart-pocket-chef/
     └── src/
         ├── App.jsx, api.js, hooks.js, styles.css, utils/measures.js
         └── components/     SearchBar, FiltersBar, ResultsToolbar, RecipeGrid, RecipeDrawer, RecipeNotes,
-                            KitchenMode, ShareDialog, PantryView, PlanView, AdminRoute, AdminDashboard, AdminRecipes, ConfirmDialog, QRModule, ShoppingList, History,
+                            KitchenMode, ShareDialog, PantryView, PlanView, AdminRoute, AdminDashboard, AdminRecipes, RecipeForm, MyRecipes, ResetPassword, ConfirmDialog, QRModule, ShoppingList, History,
                             AuthDialog, GoogleButton, Stars, Header, Toasts, Footer, EmptyState
 ```
 
@@ -190,6 +196,30 @@ Al volver a ingresar, aparece la pestaña **Admin** y se puede abrir `/admin`.
 - Eliminar una cuenta es definitivo (no hay suspensión): se borran en cascada su despensa, notas, favoritas e historial.
 
 **Recetas peruanas desde el panel.** La pestaña "Recetas peruanas" lista los platos de la tabla `custom_recipes` y permite agregar, corregir (nombre, categoría, ingredientes con su medida, pasos en el orden que quieras) y borrar. Cada cambio se refleja al instante en el buscador, en "Comida peruana" y en las estadísticas, sin reiniciar nada. Cada ingrediente lleva una **clave en inglés** (`chicken` para pollo): es la palabra con la que el buscador lo cruza con lo que escribe la gente; si la dejas vacía se completa sola con el diccionario. La foto de un plato nuevo se busca en Unsplash por su nombre (o por el texto que escribas); las de los 20 primeros son fijas y no se tocan. Las recetas de TheMealDB no se pueden editar.
+
+## Recuperar contraseña por correo
+
+**Cómo funciona.** `POST /api/auth/forgot` genera un token aleatorio de 32 bytes, guarda solo su hash SHA-256 en `password_resets` (con vencimiento de 1 hora) y envía por correo el enlace `…/restablecer?token=…`. `POST /api/auth/reset` valida el token, cambia la contraseña y lo gasta (un enlace nuevo anula los anteriores; dos usos a la vez no pasan). La respuesta de "olvidé mi contraseña" es siempre la misma, exista o no el correo, para que nadie pueda averiguar quién tiene cuenta. Quien entra con Google también puede usarlo para ponerse una contraseña.
+
+**Activarlo.** Hace falta una cuenta de correo que envíe los mensajes (los dominios temporales de Hostinger no tienen buzón). Lo más simple es **Gmail**:
+
+1. En tu cuenta de Google activa la **verificación en dos pasos** y crea una **contraseña de aplicación** (Cuenta de Google → Seguridad → Contraseñas de aplicaciones). Es una clave de 16 letras, distinta de la de tu cuenta.
+2. En el backend define estas variables (en Hostinger: la app de la API → variables de entorno), y reinicia o redespliega:
+
+   | Variable | Valor |
+   |---|---|
+   | `SMTP_HOST` | `smtp.gmail.com` |
+   | `SMTP_PORT` | `465` |
+   | `SMTP_USER` | tu correo de Gmail |
+   | `SMTP_PASS` | la contraseña de aplicación (nunca la de tu cuenta ni la pegues en un chat) |
+   | `MAIL_FROM` | opcional: la dirección que aparece como remitente (por defecto, `SMTP_USER`) |
+   | `APP_URL` | opcional: URL del frontend para el enlace (por defecto, `CLIENT_ORIGIN`) |
+
+Sin `SMTP_HOST`: **en desarrollo** el correo se imprime en la consola del servidor (así se prueba sin configurar nada) y **en producción** "¿Olvidaste tu contraseña?" responde que la función todavía no está activa. Otros proveedores SMTP (Brevo, Outlook…) sirven igual con sus datos.
+
+## Mis recetas (privadas)
+
+Cada receta propia se guarda en `user_recipes` ligada a la cuenta. Todas las consultas filtran por el usuario de la sesión, así que pedir, editar o borrar la receta de otra persona responde 404, y la ruta pública `/api/recipes/:id` nunca las sirve. Su id público es `10.000.000 + id de la fila` (los de TheMealDB llegan a ~53.000 y los peruanos empiezan en 900.001), para que favoritas, notas, plan y `?r=` sigan funcionando con ids numéricos. Se suman a las búsquedas, la despensa y el plan **solo de su dueña o dueño** (el catálogo compartido no las incluye), no se comparten por enlace ni QR, y se borran con la cuenta. Al cerrar sesión se vacía la copia de búsquedas guardada para uso sin internet.
 
 ## Acceso con Google (opcional)
 

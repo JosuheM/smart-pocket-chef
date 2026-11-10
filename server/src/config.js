@@ -13,6 +13,16 @@ export const config = {
   clientOrigin: (process.env.CLIENT_ORIGIN || 'http://localhost:5173').split(',').map((s) => s.trim()),
   trustProxy: process.env.TRUST_PROXY === 'true', // true detrás de Render, Railway, Hostinger, etc.
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-cambialo',
+  // Dirección pública del frontend: los enlaces de los correos (recuperar contraseña) apuntan ahí
+  appUrl: (process.env.APP_URL || (process.env.CLIENT_ORIGIN || 'http://localhost:5173').split(',')[0]).trim().replace(/\/$/, ''),
+  // Correo saliente (recuperar contraseña). Sin SMTP_HOST, en desarrollo el enlace se imprime en la consola del servidor.
+  smtp: {
+    host: process.env.SMTP_HOST || '',
+    port: Number(process.env.SMTP_PORT) || 465,
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.MAIL_FROM || process.env.SMTP_USER || '',
+  },
   // ID de cliente de Google (Google Cloud Console > Credenciales). Sin él, el botón "Continuar con Google" no aparece.
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
   unsplashKey: process.env.UNSPLASH_ACCESS_KEY || '',

@@ -68,6 +68,9 @@ function qs(params) {
   return p.toString();
 }
 
+export const MY_BASE = 10_000_000; // mismo valor que server/src/services/userRecipes.js
+const isMine = (id) => Number(id) >= MY_BASE;
+
 const diets = (list) => (list && list.length ? list.join(',') : undefined);
 
 export const api = {
@@ -75,7 +78,15 @@ export const api = {
     request(`/recipes/search?${qs({ ingredients: ingredients.join(','), mode, sort, category, area, diet: diets(diet), pantry, offset, limit })}`),
   explore: ({ q, category, area, diet, offset = 0, limit = 12 }) =>
     request(`/recipes/explore?${qs({ q, category, area, diet: diets(diet), offset, limit })}`),
-  recipe: (id, have, pantry) => request(`/recipes/${id}?have=${csv(have)}${pantry ? '&pantry=1' : ''}`),
+  // Las recetas propias de la persona (id desde 10.000.000) viven en /my/recipes y solo las ve su dueña o dueño
+  recipe: (id, have, pantry) => request(`${isMine(id) ? '/my/recipes' : '/recipes'}/${id}?have=${csv(have)}${pantry ? '&pantry=1' : ''}`),
+  myRecipes: () => request('/my/recipes'),
+  myRecipeForEdit: (id) => request(`/my/recipes/${id}/edit`),
+  createMyRecipe: (recipe) => request('/my/recipes', { method: 'POST', body: recipe }),
+  updateMyRecipe: (id, recipe) => request(`/my/recipes/${id}`, { method: 'PUT', body: recipe }),
+  deleteMyRecipe: (id) => request(`/my/recipes/${id}`, { method: 'DELETE' }),
+  forgotPassword: (email) => request('/auth/forgot', { method: 'POST', body: { email }, auth: false }),
+  resetPassword: (token, password) => request('/auth/reset', { method: 'POST', body: { token, password }, auth: false }),
   suggest: (q) => request(`/recipes/ingredients?q=${encodeURIComponent(q)}`),
   meta: () => request('/recipes/meta'),
   status: (fresh) => request(`/status${fresh ? '?fresh=1' : ''}`),

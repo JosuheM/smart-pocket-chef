@@ -18,6 +18,7 @@ const CARDS = [
   ['notes', 'Notas y calificaciones'],
   ['shoppingLists', 'Listas de compras'],
   ['customRecipes', 'Recetas propias (Perú)'],
+  ['userRecipes', 'Recetas creadas por usuarios'],
 ];
 
 export default function AdminDashboard({ me, notify, onForbidden }) {

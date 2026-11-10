@@ -42,6 +42,9 @@ function prepare(meal) {
   };
 }
 
+/** Prepara recetas ajenas al catálogo (las privadas de una persona) para mezclarlas en SUS búsquedas, sin guardarlas aquí. */
+export const prepareMeals = (list) => list.map(prepare);
+
 /** Cambia las recetas propias (por ejemplo, al leerlas de MySQL) y vuelve a indexar sin descargar nada. */
 export function setCustomRecipes(list) {
   custom = list;
@@ -189,7 +192,7 @@ export const isKnown = (stems) => stems.some((s) => knownStems.some((k) => stemM
 
 const card = (m, extra = {}) => ({
   id: m.id, name: m.name, nameEn: m.nameEn, category: m.category, area: m.area, thumb: m.thumb,
-  local: Boolean(m.local), photoQuery: m.photo, picture: m.picture, ...extra,
+  local: Boolean(m.local), photoQuery: m.photo, picture: m.picture, noPhoto: Boolean(m.noPhoto), ...extra,
 });
 
 const byName = (a, b) => a.name.localeCompare(b.name);
@@ -209,11 +212,11 @@ function facetsOf(list) {
  * Busca por ingredientes. `groups` = [{ label, stems }]: cada grupo es un ingrediente del usuario con sus
  * equivalencias en inglés. Con `pantry`, sal, pimienta, agua y aceite no cuentan como ingredientes que faltan.
  */
-export function searchMeals({ groups, pantry, mode, category, sort, area = '', diet = [] }) {
+export function searchMeals({ groups, pantry, mode, category, sort, area = '', diet = [], extra = [] }) {
   const active = groups.filter((g) => g.known);
   const scored = [];
 
-  for (const m of meals) {
+  for (const m of extra.length ? [...meals, ...extra] : meals) {
     if (!allowed(m, area, diet)) continue;
     let used = 0;
     const have = new Set();
@@ -245,9 +248,9 @@ export function searchMeals({ groups, pantry, mode, category, sort, area = '', d
 }
 
 /** Explora el catálogo por nombre y/o categoría. `tokens` = [[candidatos de la palabra 1], [palabra 2], …]. */
-export function exploreMeals({ tokens = [], category, area, diet = [] }) {
+export function exploreMeals({ tokens = [], category, area, diet = [], extra = [] }) {
   const scored = [];
-  for (const m of meals) {
+  for (const m of extra.length ? [...meals, ...extra] : meals) {
     if (!allowed(m, area, diet)) continue;
     if (tokens.length) {
       const es = normalize(m.local ? m.name : peek(m.name) ?? '');

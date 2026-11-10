@@ -55,6 +55,9 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 | `MYMEMORY_EMAIL` | tu correo (sube el límite de traducción de 5,000 a 50,000 caracteres al día) |
 | `TRANSLATE` | `true` |
 | `PREFER_UNSPLASH` | `false` |
+| `GOOGLE_CLIENT_ID` | (opcional) el ID de cliente de Google para "Continuar con Google"; ver el README |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | (opcional) el correo que envía el enlace de "¿Olvidaste tu contraseña?"; ver "Recuperar contraseña" en el README. Sin esto, ese enlace responde que la función no está activa |
+| `APP_URL` | (opcional) la URL del frontend para los enlaces de los correos; si falta se usa `CLIENT_ORIGIN` |
 
 4. Despliega y abre el dominio temporal de la API con `/api/health`, por ejemplo `https://tu-api.hostingersite.com/api/health`. Debe mostrar:
 

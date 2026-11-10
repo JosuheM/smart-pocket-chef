@@ -23,7 +23,7 @@ router.post('/shopping', optionalAuth, wrap(async (req, res) => {
     throw new HttpError(400, `Elige entre ${MIN_MEALS} y ${MAX_MEALS} recetas para armar el plan de la semana.`);
   }
 
-  const planned = await mapLimit(meals, 3, (m) => planMeal(m.id, m.servings));
+  const planned = await mapLimit(meals, 3, (m) => planMeal(m.id, m.servings, req.user?.id));
   const items = planned.flatMap((p) => p.ingredients);
   const list = buildShoppingList(items, 'Compra semanal', { maxText: 1400 });
 

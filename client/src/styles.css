@@ -552,6 +552,13 @@ button.star:hover { transform: scale(1.15); }
   .form-ing input:first-child { grid-column: 1 / -1; }
 }
 
+/* ---------- Recuperar contraseña y mis recetas ---------- */
+.forgot-link { justify-self: start; padding: 0; font-size: 0.95rem; }
+.reset { max-width: 28rem; }
+.reset-form { margin-top: 1rem; }
+.my-recipes .admin-head { margin-top: 1.5rem; }
+.my-recipes .section-title { margin: 0; }
+
 /* ---------- Celulares ---------- */
 @media (max-width: 720px) {
   .topbar { gap: 0.4rem 1rem; }

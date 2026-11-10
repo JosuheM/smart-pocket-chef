@@ -7,6 +7,8 @@ import SearchBar from './components/SearchBar.jsx';
 import FiltersBar from './components/FiltersBar.jsx';
 import PantryView from './components/PantryView.jsx';
 import PlanView from './components/PlanView.jsx';
+import MyRecipes from './components/MyRecipes.jsx';
+import ResetPassword from './components/ResetPassword.jsx';
 import AdminRoute from './components/AdminRoute.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import ResultsToolbar from './components/ResultsToolbar.jsx';
@@ -43,7 +45,7 @@ export default function App() {
   const navigate = useNavigate();
   const onAdminPage = location.pathname === '/admin';
   const [authDialog, setAuthDialog] = useState(null); // null | { notice }
-  const [view, setView] = useState('search'); // search | pantry | plan | favorites | list | history
+  const [view, setView] = useState('search'); // search | pantry | plan | mine | favorites | list | history
   const [searchMode, setSearchMode] = useState('ingredients'); // ingredients | name
   const [pantry, setPantry] = useLocalStorage('spc_pantry', true); // true: sal, pimienta, agua y aceite no cuentan como faltantes
   const [diet, setDiet] = useLocalStorage('spc_diet', []); // gluten | dairy | nuts: recetas SIN esos ingredientes
@@ -258,10 +260,20 @@ export default function App() {
     notify(isNew ? `¡Cuenta creada! Bienvenido, ${u.name.split(' ')[0]}.` : `Hola de nuevo, ${u.name.split(' ')[0]}.`);
   };
 
+  // Después de cambiar la contraseña con el enlace del correo, la sesión queda abierta
+  const handleReset = ({ token, user: u }) => {
+    setToken(token);
+    setUser(u);
+    notify(`Contraseña actualizada. Ya estás dentro, ${u.name.split(' ')[0]}.`);
+    navigate('/', { replace: true });
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
     setPantryTotal(null);
+    // Las búsquedas guardadas para uso sin internet pueden incluir recetas propias de esa persona: se borran al salir
+    window.caches?.delete('spc-data-v2').catch(() => {});
     if (view === 'favorites' || view === 'history') setView('search');
     notify('Cerraste sesión.');
   };
@@ -331,6 +343,7 @@ export default function App() {
             </main>
           )}
         />
+        <Route path="/restablecer" element={<ResetPassword onDone={handleReset} />} />
         <Route path="*" element={(
       <main id="contenido">
         {!online && (
@@ -449,6 +462,8 @@ export default function App() {
             notify={notify}
           />
         )}
+
+        {view === 'mine' && <MyRecipes user={user} onNeedLogin={openLogin} onOpen={setSelectedId} notify={notify} />}
 
         {view === 'plan' && <PlanView plan={plan} user={user} cart={cart} onOpen={setSelectedId} onSearch={() => goTo('search')} notify={notify} />}
 

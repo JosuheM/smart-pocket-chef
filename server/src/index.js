@@ -17,6 +17,7 @@ import notesRoutes from './routes/notes.js';
 import planRoutes from './routes/plan.js';
 import shareRoutes from './routes/share.js';
 import adminRoutes from './routes/adminRoutes.js';
+import myRecipeRoutes from './routes/myRecipes.js';
 
 const app = express();
 if (config.trustProxy) app.set('trust proxy', 1);
@@ -50,6 +51,7 @@ app.use('/api/notes', rateLimit({ windowMs: 60 * 1000, max: 90 }), notesRoutes);
 app.use('/api/plan', rateLimit({ windowMs: 60 * 1000, max: 20 }), planRoutes);
 app.use('/api/share', rateLimit({ windowMs: 60 * 1000, max: 60 }), shareRoutes);
 app.use('/api/admin', rateLimit({ windowMs: 60 * 1000, max: 120 }), adminRoutes);
+app.use('/api/my/recipes', rateLimit({ windowMs: 60 * 1000, max: 90 }), myRecipeRoutes);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
 
 // eslint-disable-next-line no-unused-vars

@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   exploreRecipes, getRecipe, heroImage, ingredientSuggestions, randomRecipeId, recipeMeta, searchRecipes,
 } from '../services/mealdb.js';
+import { optionalAuth } from '../middleware/auth.js';
+import { isMyId } from '../services/userRecipes.js';
 import { parseDiet } from '../utils/diet.js';
 import { HttpError, clampInt, wrap } from '../utils/http.js';
 
@@ -12,7 +14,7 @@ const flag = (v) => v === '1' || v === 'true';
 
 // GET /api/recipes/search?ingredients=pollo,tomate&mode=any|all&sort=match|missing&category=Chicken&area=Italian&diet=gluten,dairy&pantry=1&limit=12&offset=0
 // diet = recetas SIN esos ingredientes: gluten, dairy (lácteos), nuts (frutos secos)
-router.get('/search', wrap(async (req, res) => {
+router.get('/search', optionalAuth, wrap(async (req, res) => {
   const terms = list(req.query.ingredients);
   if (!terms.length) throw new HttpError(400, 'Escribe al menos un ingrediente.');
   res.json(await searchRecipes({
@@ -23,17 +25,18 @@ router.get('/search', wrap(async (req, res) => {
     area: String(req.query.area ?? ''),
     diet: parseDiet(req.query.diet),
     pantry: flag(req.query.pantry),
+    userId: req.user?.id, // con sesión, sus recetas propias se suman a la búsqueda (solo para ella o él)
     ...paging(req.query),
   }));
 }));
 
 // GET /api/recipes/explore?q=lasaña&category=Pasta&area=Peruvian&diet=nuts  (por nombre, categoría y/o país)
-router.get('/explore', wrap(async (req, res) => {
+router.get('/explore', optionalAuth, wrap(async (req, res) => {
   const q = String(req.query.q ?? '').trim().slice(0, 60);
   const category = String(req.query.category ?? '');
   const area = String(req.query.area ?? '');
   if (!q && !category && !area) throw new HttpError(400, 'Escribe el nombre de un platillo o elige una categoría.');
-  res.json(await exploreRecipes({ q, category, area, diet: parseDiet(req.query.diet), ...paging(req.query) }));
+  res.json(await exploreRecipes({ q, category, area, diet: parseDiet(req.query.diet), userId: req.user?.id, ...paging(req.query) }));
 }));
 
 // GET /api/recipes/peru  -> atajo: los platos peruanos (propios, TheMealDB no trae ninguno)
@@ -60,6 +63,7 @@ router.get('/hero', wrap(async (req, res) => res.json((await heroImage()) ?? {})
 // GET /api/recipes/52772?have=pollo,ajo&pantry=1 -> receta completa, con cada ingrediente marcado como "have"
 router.get('/:id', wrap(async (req, res) => {
   if (!/^\d+$/.test(req.params.id)) throw new HttpError(400, 'Identificador de receta inválido.');
+  if (isMyId(req.params.id)) throw new HttpError(404, 'No encontramos esa receta.'); // las recetas propias van por /api/my/recipes
   res.json(await getRecipe(req.params.id, list(req.query.have), flag(req.query.pantry)));
 }));
 

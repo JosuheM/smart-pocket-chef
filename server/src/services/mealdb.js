@@ -13,6 +13,7 @@ import {
 } from './catalog.js';
 import { heroPhoto, searchPhoto, trackUse } from './unsplash.js';
 import { provider, translateMany, translateOne } from './translate.js';
+import { getUserRow, isMyId, rowToMeal, userMeals } from './userRecipes.js';
 
 const MAX_TERMS = 10;
 const STOPWORDS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'con', 'y', 'en', 'a', 'al', 'un', 'una']);
@@ -51,6 +52,7 @@ export async function resolveTerms(rawTerms) {
 
 /** Una foto de TheMealDB (tamaño mediano para las tarjetas) o, si falta, de Unsplash. */
 async function cardImage(meal) {
+  if (meal.noPhoto) return { image: null, credit: null }; // recetas propias de una persona: sin foto
   if (meal.thumb) return { image: photo(meal.thumb, 'medium'), credit: null };
   if (meal.picture) return { image: meal.picture.url, credit: meal.picture.credit }; // foto fija: no gasta cuota
   const found = await searchPhoto(meal.photoQuery ?? meal.name);
@@ -84,12 +86,26 @@ function paginate(list, facets, offset, limit) {
   return { total: list.length, facets, hasMore: offset + limit < list.length, page: list.slice(offset, offset + limit) };
 }
 
-export async function searchRecipes({ terms, mode, category, sort, pantry, area, diet = [], limit, offset }) {
+/**
+ * Con recetas propias de la persona en juego, un ingrediente que solo ellas usan ("ají panca") también cuenta como conocido,
+ * y se busca además por lo que escribió (las recetas propias guardan los nombres en español).
+ */
+function withUserTerms(groups, extra) {
+  if (!extra.length) return groups;
+  return groups.map((g) => {
+    const stems = [...new Set([...g.stems, stem(normalize(g.label))])];
+    const known = g.known || extra.some((m) => m.ingredients.some((i) => stems.some((s) => stemMatches(s, i.stem))));
+    return { ...g, stems, known };
+  });
+}
+
+export async function searchRecipes({ terms, mode, category, sort, pantry, area, diet = [], userId, limit, offset }) {
   await ensureCatalog();
-  const groups = await resolveTerms(terms);
+  const extra = await userMeals(userId);
+  const groups = withUserTerms(await resolveTerms(terms), extra);
   const { list, facets } = searchMeals({
     groups, pantry, mode: mode === 'all' ? 'all' : 'any', category: validCategory(category), sort: sort === 'missing' ? 'missing' : 'match',
-    area: validArea(area), diet,
+    area: validArea(area), diet, extra,
   });
   const { page, ...meta } = paginate(list, facets, offset, limit);
   return {
@@ -115,7 +131,7 @@ async function queryTokens(q) {
   return tokens.map((c) => [...c]);
 }
 
-export async function exploreRecipes({ q, category, area, diet = [], limit, offset }) {
+export async function exploreRecipes({ q, category, area, diet = [], userId, limit, offset }) {
   await ensureCatalog();
   const cleanArea = validArea(area);
 
@@ -129,7 +145,7 @@ export async function exploreRecipes({ q, category, area, diet = [], limit, offs
   }
 
   const tokens = q ? await queryTokens(q) : [];
-  const { list, facets } = exploreMeals({ tokens, category: validCategory(category), area: cleanArea, diet });
+  const { list, facets } = exploreMeals({ tokens, category: validCategory(category), area: cleanArea, diet, extra: await userMeals(userId) });
   const { page, ...meta } = paginate(list, facets, offset, limit);
   return { ingredients: [], unknown: [], ...meta, results: await decorate(page) };
 }
@@ -138,12 +154,13 @@ export async function exploreRecipes({ q, category, area, diet = [], limit, offs
  * "Hoy puedes cocinar X recetas con lo que tienes": cruza la despensa con el catálogo (TheMealDB + recetas propias).
  * Una receta está lista cuando no le falta ningún ingrediente (sal, pimienta, agua y aceite no cuentan como faltantes).
  */
-export async function pantryOverview(terms, { diet = [], limit = 12, offset = 0 } = {}) {
+export async function pantryOverview(terms, { diet = [], userId, limit = 12, offset = 0 } = {}) {
   await ensureCatalog();
-  const groups = await resolveTerms(terms);
+  const extra = await userMeals(userId); // sus recetas propias también cuentan para "lo que puedes cocinar"
+  const groups = withUserTerms(await resolveTerms(terms), extra);
   const unknown = groups.filter((g) => !g.known).map((g) => g.label);
   if (!groups.some((g) => g.known)) return { total: 0, almost: 0, hasMore: false, unknown, results: [] };
-  const { list } = searchMeals({ groups, pantry: true, mode: 'any', category: '', sort: 'missing', diet });
+  const { list } = searchMeals({ groups, pantry: true, mode: 'any', category: '', sort: 'missing', diet, extra });
   const ready = list.filter((r) => r.missing === 0);
   const almost = list.filter((r) => r.missing > 0 && r.missing <= 2).length;
   return {
@@ -152,10 +169,16 @@ export async function pantryOverview(terms, { diet = [], limit = 12, offset = 0 
 }
 
 /** Ingredientes de una receta ya en español y escalados a `servings` personas (la base son 2), para el plan semanal. */
-export async function planMeal(id, servings = 2) {
+export async function planMeal(id, servings = 2, userId = null) {
   await ensureCatalog().catch(() => {});
-  let meal = catalogMeal(id);
-  if (!meal) {
+  let meal = null;
+  if (isMyId(id)) { // receta propia: solo si es de quien arma el plan
+    const row = userId ? await getUserRow(userId, id) : null;
+    meal = row ? rowToMeal(row) : null;
+  } else {
+    meal = catalogMeal(id);
+  }
+  if (!meal && !isMyId(id)) {
     try { meal = await lookupMeal(id); } catch (err) { if (err.status === 400) throw err; }
   }
   if (!meal) throw new HttpError(404, 'No encontramos una de las recetas del plan.');
@@ -180,10 +203,11 @@ export async function planMeal(id, servings = 2) {
 /** Receta propia (comida peruana): ya está en español, solo se marcan los ingredientes y se busca la foto. */
 async function getLocalRecipe(meal, haveTerms, pantry) {
   const groups = await resolveTerms(haveTerms);
-  const found = meal.picture ?? (await searchPhoto(meal.photo));
+  const found = meal.picture ?? (meal.noPhoto ? null : await searchPhoto(meal.photo));
   if (found) trackUse(found);
   return {
     id: meal.id,
+    mine: Boolean(meal.mine), // receta creada por la persona que la está viendo
     name: meal.name,
     nameEn: meal.nameEn,
     category: categoryEs(meal.category),
@@ -208,6 +232,13 @@ async function getLocalRecipe(meal, haveTerms, pantry) {
       };
     }),
   };
+}
+
+/** Detalle de una receta propia de la persona (null si no existe o es de otra persona). */
+export async function getUserRecipe(userId, id, haveTerms = [], pantry = false) {
+  const row = await getUserRow(userId, id);
+  if (!row) throw new HttpError(404, 'No encontramos esa receta.');
+  return getLocalRecipe(rowToMeal(row), haveTerms, pantry);
 }
 
 export async function getRecipe(id, haveTerms = [], pantry = false) {
