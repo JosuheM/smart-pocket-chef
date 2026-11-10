@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
-import { useModal } from '../hooks.js';
+import AdminRecipes from './AdminRecipes.jsx';
+import ConfirmDialog from './ConfirmDialog.jsx';
 
 const PAGE = 25;
 const date = (value) => (value ? new Date(value).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
@@ -19,30 +20,8 @@ const CARDS = [
   ['customRecipes', 'Recetas propias (Perú)'],
 ];
 
-/** Pide confirmación antes de una acción que no se puede deshacer. */
-function ConfirmDialog({ user, busy, error, onCancel, onConfirm }) {
-  const ref = useRef(null);
-  useModal(ref, onCancel);
-  return (
-    <>
-      <div className="backdrop backdrop-top" onClick={busy ? undefined : onCancel} />
-      <div ref={ref} className="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
-        <h2 id="confirm-title">¿Eliminar esta cuenta?</h2>
-        <p id="confirm-text">
-          Vas a eliminar a <strong>{user.name}</strong> ({user.email}). Se borrarán también sus favoritas, su despensa, sus notas y su historial de compras.
-          <strong> Esta acción no se puede deshacer.</strong>
-        </p>
-        {error && <p className="alert" role="alert">{error}</p>}
-        <div className="admin-confirm">
-          <button className="btn" onClick={onCancel} disabled={busy} autoFocus>Cancelar</button>
-          <button className="btn btn-danger" onClick={onConfirm} disabled={busy}>{busy ? 'Eliminando…' : 'Sí, eliminar'}</button>
-        </div>
-      </div>
-    </>
-  );
-}
-
 export default function AdminDashboard({ me, notify, onForbidden }) {
+  const [tab, setTab] = useState('users'); // users | recipes
   const [stats, setStats] = useState(null);
   const [statsError, setStatsError] = useState('');
   const [users, setUsers] = useState([]);
@@ -139,6 +118,15 @@ export default function AdminDashboard({ me, notify, onForbidden }) {
         ))}
       </div>
 
+      <div className="chips admin-tabs" role="group" aria-label="Secciones del panel">
+        <button type="button" className="chip" aria-pressed={tab === 'users'} onClick={() => setTab('users')}>Usuarios</button>
+        <button type="button" className="chip" aria-pressed={tab === 'recipes'} onClick={() => setTab('recipes')}>Recetas peruanas</button>
+      </div>
+
+      {tab === 'recipes' && <AdminRecipes notify={notify} onForbidden={onForbidden} onChanged={loadStats} />}
+
+      {tab === 'users' && (
+      <>
       <div className="admin-head">
         <h3>Usuarios {total > 0 && <span className="plan-count">{total}</span>}</h3>
         <form className="admin-search" onSubmit={submitSearch} role="search">
@@ -214,12 +202,19 @@ export default function AdminDashboard({ me, notify, onForbidden }) {
 
       {toDelete && (
         <ConfirmDialog
-          user={toDelete}
+          title="¿Eliminar esta cuenta?"
+          confirmLabel="Sí, eliminar"
+          busyLabel="Eliminando…"
           busy={working === toDelete.id}
           error={deleteError}
           onCancel={() => setToDelete(null)}
           onConfirm={confirmDelete}
-        />
+        >
+          Vas a eliminar a <strong>{toDelete.name}</strong> ({toDelete.email}). Se borrarán también sus favoritas, su despensa, sus notas y su historial de compras.
+          <strong> Esta acción no se puede deshacer.</strong>
+        </ConfirmDialog>
+      )}
+      </>
       )}
     </section>
   );

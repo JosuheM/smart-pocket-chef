@@ -55,14 +55,26 @@ const fromRow = (r) => ({
   steps: parse(r.steps, []),
 });
 
-/** Lee las recetas propias de MySQL y las entrega al catálogo. Si la tabla está vacía, la llena primero. */
+/**
+ * Vuelve a leer las recetas propias de MySQL y se las entrega al catálogo (el buscador las usa al instante).
+ * Se llama al arrancar y cada vez que el administrador agrega, corrige o borra un plato.
+ */
+export async function reloadCustomRecipes() {
+  const [rows] = await getPool().query('SELECT * FROM custom_recipes ORDER BY CAST(id AS UNSIGNED)');
+  const meals = rows.map(fromRow).filter((m) => m.ingredients.length && m.steps.length);
+  setCustomRecipes(meals);
+  return meals.length;
+}
+
+/**
+ * Al arrancar: si la tabla está vacía (primera vez) se siembra con data/peru.js y luego se carga en el catálogo.
+ * No se vuelve a sembrar con la tabla llena: así un plato que el administrador borró o corrigió no reaparece ni se pisa.
+ */
 export async function syncCustomRecipes() {
   if (!isDbReady()) return 0;
-  const pool = getPool();
-  await seedPeruvian(); // solo agrega las que faltan: lo que se edite en la base no se pisa
-  const [rows] = await pool.query('SELECT * FROM custom_recipes ORDER BY CAST(id AS UNSIGNED)');
-  const meals = rows.map(fromRow).filter((m) => m.ingredients.length && m.steps.length);
-  if (meals.length) setCustomRecipes(meals);
-  console.log(`Recetas propias cargadas desde MySQL: ${meals.length}.`);
-  return meals.length;
+  const [[{ n }]] = await getPool().query('SELECT COUNT(*) AS n FROM custom_recipes');
+  if (n === 0) await seedPeruvian();
+  const count = await reloadCustomRecipes();
+  console.log(`Recetas propias cargadas desde MySQL: ${count}.`);
+  return count;
 }

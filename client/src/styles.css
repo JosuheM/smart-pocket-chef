@@ -534,6 +534,23 @@ button.star:hover { transform: scale(1.15); }
 .role { padding: 0.1rem 0.65rem; background: var(--mint); border: 1px solid var(--line); border-radius: 999px; font-size: 0.82rem; font-weight: 700; white-space: nowrap; }
 .role[data-role='admin'] { background: var(--lemon); border-color: var(--spruce); }
 .admin-confirm { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.6rem; }
+.admin-tabs { margin: 1.5rem 0 0; }
+.dialog-wide { width: min(780px, calc(100% - 2rem)); max-height: calc(100% - 2rem); }
+.recipe-form { gap: 0.9rem; }
+.recipe-form select { padding: 0.55rem 0.6rem; background: #fff; border: 2px solid var(--spruce); border-radius: 8px; font-weight: 400; }
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.9rem; }
+.form-list { display: grid; gap: 0.5rem; min-width: 0; margin: 0; padding: 0.8rem; border: 2px dashed var(--line); border-radius: 10px; }
+.form-list legend { padding: 0 0.4rem; font-weight: 700; }
+.form-ing { display: grid; grid-template-columns: 2fr 1.2fr 1.2fr auto; align-items: center; gap: 0.4rem; }
+.form-ing input { min-width: 0; padding: 0.45rem 0.6rem; background: #fff; border: 2px solid var(--spruce); border-radius: 8px; }
+.form-list > .btn { justify-self: start; }
+.form-step { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 0.5rem; }
+.form-step-n { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; margin-top: 0.3rem; background: var(--lemon); border: 2px solid var(--spruce); border-radius: 50%; font-weight: 800; font-size: 0.85rem; }
+.form-step-tools { display: flex; flex-direction: column; align-items: flex-start; }
+@media (max-width: 720px) {
+  .form-ing { grid-template-columns: 1fr 1fr; }
+  .form-ing input:first-child { grid-column: 1 / -1; }
+}
 
 /* ---------- Celulares ---------- */
 @media (max-width: 720px) {

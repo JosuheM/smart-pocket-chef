@@ -31,7 +31,7 @@ Buscador de recetas por ingredientes y gestor de compras. Aplicación full-stack
 - **Compartir receta:** enlace exacto de la app, QR de QuickChart (con respaldo local), WhatsApp, Telegram, Facebook, correo y el menú del celular.
 - **App instalable (PWA):** `client/public/manifest.json`, iconos y service worker; funciona sin internet con lo que ya viste.
 - **25 platos peruanos en MySQL** (`custom_recipes`), mezclados con TheMealDB sin que la pantalla note la diferencia.
-- **Panel de administración** (`/admin`, solo administradores): estadísticas, lista de usuarios con búsqueda, cambio de rol y eliminación de cuentas con confirmación. Ver [Panel de administración](#panel-de-administración).
+- **Panel de administración** (`/admin`, solo administradores): estadísticas, lista de usuarios con búsqueda, cambio de rol y eliminación de cuentas con confirmación, y **gestión de las recetas peruanas** (agregar, corregir y borrar platos). Ver [Panel de administración](#panel-de-administración).
 
 ## Requisitos
 
@@ -69,7 +69,7 @@ Al arrancar también crea la base `smart_pocket_chef` y sus tablas. Si prefieres
 
 Notas importantes:
 
-- **Comida peruana.** TheMealDB no trae ningún plato del Perú (tampoco de Chile, Colombia o Argentina), y no encontramos una API gratuita con recetas peruanas. Por eso hay 25 recetas propias. La fuente es `server/src/data/peru.js`; al arrancar con MySQL, el servidor las **siembra en la tabla `custom_recipes`** (solo agrega las que faltan, así lo que edites en la base no se pisa; `npm run seed -- --force` las actualiza desde el archivo) y el catálogo las lee de ahí. Se suman a las de TheMealDB, salen en la búsqueda por ingredientes (`ají amarillo`, `rocoto`…) y tienen su acceso "Comida peruana" en el inicio. Si MySQL no responde, el catálogo usa el mismo archivo como copia de seguridad. Los 20 primeros platos tienen una foto fija de Unsplash elegida a mano en `server/src/data/peru-photos.js`, con crédito al autor; los 5 nuevos buscan su foto en Unsplash por nombre (y muestran un degradado si no hay cuota). Algunas fotos son aproximadas (picarones, mazamorra morada y sopa criolla no tienen una foto exacta).
+- **Comida peruana.** TheMealDB no trae ningún plato del Perú (tampoco de Chile, Colombia o Argentina), y no encontramos una API gratuita con recetas peruanas. Por eso hay 25 recetas propias. La fuente es `server/src/data/peru.js`; al arrancar con MySQL, si la tabla `custom_recipes` está vacía el servidor las **siembra** ahí (con la tabla llena no vuelve a sembrar: lo que el administrador agregue, corrija o borre desde el panel se queda así; `npm run seed` agrega las que falten del archivo y `npm run seed -- --force` las actualiza desde él) y el catálogo las lee de ahí. Se suman a las de TheMealDB, salen en la búsqueda por ingredientes (`ají amarillo`, `rocoto`…) y tienen su acceso "Comida peruana" en el inicio. Si MySQL no responde, el catálogo usa el mismo archivo como copia de seguridad. Los 20 primeros platos tienen una foto fija de Unsplash elegida a mano en `server/src/data/peru-photos.js`, con crédito al autor; los 5 nuevos buscan su foto en Unsplash por nombre (y muestran un degradado si no hay cuota). Algunas fotos son aproximadas (picarones, mazamorra morada y sopa criolla no tienen una foto exacta).
 - **País y TheMealDB.** El catálogo local ya guarda el país de cada receta (`strArea`), por eso el selector de país filtra al instante y también sin internet. Si el catálogo completo aún no se descargó, el país se consulta directo a TheMealDB con `filter.php?a={país}` (`services/themealdb.js`, `filterByArea`).
 
 - **Búsqueda con varios ingredientes.** La clave gratuita de TheMealDB solo filtra por *un* ingrediente a la vez (el filtro múltiple es de pago). Por eso el backend guarda el catálogo (~790 recetas) en memoria y hace el cruce de ingredientes localmente (`catalog.js`). `utils/text.js` decide si "chicken" coincide con "Chicken Breast" pero no "milk" con "Coconut Milk".
@@ -128,6 +128,8 @@ Para llevar el proyecto a otra computadora sin internet, copia también la carpe
 | PUT | `/api/admin/users/:id/role` `{ role: 'admin' \| 'user' }` | **admin** | Cambia el rol (no el propio; siempre debe quedar un administrador) |
 | DELETE | `/api/admin/users/:id` | **admin** | Elimina la cuenta y, en cascada, su despensa, notas, favoritas e historial |
 | GET | `/api/admin/stats` | **admin** | Totales: usuarios, administradores, despensas, favoritas, notas, listas, recetas propias |
+| GET · POST | `/api/admin/recipes` | **admin** | Lista las recetas peruanas / agrega un plato (`name`, `category`, `ingredients: [{ es, measure, name }]`, `steps`) |
+| GET · PUT · DELETE | `/api/admin/recipes/:id` | **admin** | Detalle, corrección y borrado de un plato (el borrado también limpia sus favoritas y notas) |
 | GET · POST · DELETE | `/api/favorites` | sesión | Recetas favoritas |
 | GET · DELETE | `/api/shopping/history` | sesión | Historial de listas de compras |
 | GET | `/api/health` | público | Estado del servidor, la base, la traducción y el catálogo |
@@ -148,7 +150,7 @@ smart-pocket-chef/
 │       ├── config.js, db.js
 │       ├── middleware/     auth, rateLimit
 │       ├── routes/         auth, recipes, favorites, shopping, pantry, notes, plan, share, adminRoutes
-│       ├── controllers/    adminController
+│       ├── controllers/    adminController, adminRecipesController
 │       ├── services/       themealdb, catalog, mealdb, customRecipes, unsplash, quickchart, translate
 │       ├── data/           peru.js (25 recetas), peru-photos.js
 │       └── utils/          text, ingredients-es, spanish, units, measures, diet, http
@@ -158,7 +160,7 @@ smart-pocket-chef/
     └── src/
         ├── App.jsx, api.js, hooks.js, styles.css, utils/measures.js
         └── components/     SearchBar, FiltersBar, ResultsToolbar, RecipeGrid, RecipeDrawer, RecipeNotes,
-                            KitchenMode, ShareDialog, PantryView, PlanView, AdminRoute, AdminDashboard, QRModule, ShoppingList, History,
+                            KitchenMode, ShareDialog, PantryView, PlanView, AdminRoute, AdminDashboard, AdminRecipes, ConfirmDialog, QRModule, ShoppingList, History,
                             AuthDialog, GoogleButton, Stars, Header, Toasts, Footer, EmptyState
 ```
 
@@ -186,6 +188,8 @@ Al volver a ingresar, aparece la pestaña **Admin** y se puede abrir `/admin`.
 - La ruta `/admin` del frontend (`react-router-dom`, `AdminRoute.jsx`) redirige al inicio a quien no sea administrador. Eso solo oculta la pantalla: la seguridad real es la del servidor.
 - `client/public/.htaccess` hace que Hostinger abra la aplicación al entrar directo a `/admin` o recargar esa página.
 - Eliminar una cuenta es definitivo (no hay suspensión): se borran en cascada su despensa, notas, favoritas e historial.
+
+**Recetas peruanas desde el panel.** La pestaña "Recetas peruanas" lista los platos de la tabla `custom_recipes` y permite agregar, corregir (nombre, categoría, ingredientes con su medida, pasos en el orden que quieras) y borrar. Cada cambio se refleja al instante en el buscador, en "Comida peruana" y en las estadísticas, sin reiniciar nada. Cada ingrediente lleva una **clave en inglés** (`chicken` para pollo): es la palabra con la que el buscador lo cruza con lo que escribe la gente; si la dejas vacía se completa sola con el diccionario. La foto de un plato nuevo se busca en Unsplash por su nombre (o por el texto que escribas); las de los 20 primeros son fijas y no se tocan. Las recetas de TheMealDB no se pueden editar.
 
 ## Acceso con Google (opcional)
 
