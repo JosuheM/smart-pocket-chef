@@ -1,6 +1,4 @@
-import StatusPanel from './StatusPanel.jsx';
-
-export default function Footer({ feedResults, notify }) {
+export default function Footer() {
   return (
     <footer className="footer">
       <p>
@@ -10,7 +8,6 @@ export default function Footer({ feedResults, notify }) {
         al español. Las recetas peruanas son propias.
       </p>
       <p className="muted">Proyecto académico full-stack: React, Node.js/Express y MySQL.</p>
-      <StatusPanel feedResults={feedResults} notify={notify} />
     </footer>
   );
 }

@@ -481,7 +481,7 @@ export default function App() {
         )} />
       </Routes>
 
-      <Footer feedResults={feed?.results} notify={notify} />
+      <Footer />
 
       {selectedId && (
         <RecipeDrawer
