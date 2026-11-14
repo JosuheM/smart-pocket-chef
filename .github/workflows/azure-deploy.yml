@@ -1,0 +1,40 @@
+name: Desplegar Smart Pocket Chef en Azure App Service
+
+# Una sola Web App de Azure sirve la API (Express) y el frontend (React compilado).
+# Configuración necesaria en GitHub (Settings -> Secrets and variables -> Actions):
+#   Secret   AZURE_WEBAPP_PUBLISH_PROFILE  contenido del perfil de publicación (.PublishSettings)
+#   Variable AZURE_WEBAPP_NAME             nombre de la Web App en Azure
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Sin VITE_API_URL el frontend llama a /api en el mismo dominio (no hay CORS).
+      - name: Compilar el frontend
+        working-directory: client
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copiar el frontend a la API
+        run: cp -r client/dist server/public
+
+      - name: Instalar dependencias de producción de la API
+        working-directory: server
+        run: npm ci --omit=dev
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: server

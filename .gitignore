@@ -7,3 +7,6 @@ dist/
 # Datos locales del servidor. Solo el catálogo de TheMealDB se sube: así el despliegue arranca sin descargarlo.
 server/data/*
 !server/data/catalog.json
+
+# Frontend compilado: lo genera el flujo de GitHub Actions dentro de server/public
+server/public/

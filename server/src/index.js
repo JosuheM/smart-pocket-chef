@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -21,7 +24,9 @@ import myRecipeRoutes from './routes/myRecipes.js';
 
 const app = express();
 if (config.trustProxy) app.set('trust proxy', 1);
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+// Sin Content-Security-Policy: la API solo devuelve JSON y, cuando sirve el frontend (Azure), la política por defecto
+// de helmet bloquearía las fotos de TheMealDB/Unsplash, el QR y el botón de Google.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: config.clientOrigin }));
 app.use(express.json({ limit: '50kb' }));
 
@@ -53,6 +58,20 @@ app.use('/api/share', rateLimit({ windowMs: 60 * 1000, max: 60 }), shareRoutes);
 app.use('/api/admin', rateLimit({ windowMs: 60 * 1000, max: 120 }), adminRoutes);
 app.use('/api/my/recipes', rateLimit({ windowMs: 60 * 1000, max: 90 }), myRecipeRoutes);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
+
+// Despliegue en una sola app (Azure): si existe server/public (el frontend compilado), Express lo sirve junto con la API.
+// Sin esa carpeta (desarrollo local o Hostinger con dos apps) no hace nada.
+const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
+if (fs.existsSync(path.join(publicDir, 'index.html'))) {
+  app.use(express.static(publicDir, {
+    setHeaders: (res, file) => { if (/[\\/](sw\.js|index\.html)$/.test(file)) res.setHeader('Cache-Control', 'no-cache'); },
+  }));
+  // Rutas del frontend (/admin, /restablecer, /receta/...): todas devuelven la misma página y React decide qué mostrar.
+  // Un archivo que no existe (/assets/viejo.js) debe dar 404, no la página principal.
+  app.get('*', (req, res) => (path.extname(req.path)
+    ? res.status(404).end()
+    : res.sendFile(path.join(publicDir, 'index.html'))));
+}
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {

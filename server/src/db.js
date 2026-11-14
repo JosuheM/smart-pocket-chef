@@ -133,9 +133,11 @@ export const onDbReady = (fn) => { readyHooks.push(fn); };
  * solo si no existe (XAMPP la primera vez) intenta crearla.
  */
 export async function initDb({ quiet = false } = {}) {
-  const { host, port, user, password, name } = config.db;
+  const { host, port, user, password, name, ssl } = config.db;
+  // Con DB_SSL=true la conexión va cifrada (TLS). Azure Database for MySQL la exige.
+  const tls = ssl ? { ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: false } } : {};
   const poolConfig = {
-    host, port, user, password, database: name,
+    host, port, user, password, database: name, ...tls,
     waitForConnections: true, connectionLimit: 10, charset: 'utf8mb4', connectTimeout: 10000,
   };
   try {
@@ -147,7 +149,7 @@ export async function initDb({ quiet = false } = {}) {
     } catch (err) {
       await p.end().catch(() => {});
       if (err.code !== 'ER_BAD_DB_ERROR') throw err;
-      const boot = await mysql.createConnection({ host, port, user, password });
+      const boot = await mysql.createConnection({ host, port, user, password, ...tls });
       await boot.query(`CREATE DATABASE IF NOT EXISTS \`${name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
       await boot.end();
       p = mysql.createPool(poolConfig);

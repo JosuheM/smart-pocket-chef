@@ -39,5 +39,7 @@ export const config = {
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     name: process.env.DB_NAME || 'smart_pocket_chef',
+    // true para conexión cifrada (TLS): Azure Database for MySQL la exige
+    ssl: process.env.DB_SSL === 'true',
   },
 };
