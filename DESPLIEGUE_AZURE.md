@@ -3,7 +3,7 @@
 Smart Pocket Chef se publica en **una sola Web App de Azure** que sirve la API (Express) y el frontend (React ya compilado). No hay segundo dominio ni CORS.
 
 ```
-Navegador ──► Web App (Node 20, plan Gratis F1) ──► MySQL Flexible Server
+Navegador ──► Web App (Node 22, plan Gratis F1) ──► MySQL Flexible Server
                  ├─ /api/*  → Express            └──► TheMealDB · Unsplash · QuickChart · MyMemory
                  └─ /*      → React (client/dist copiado a server/public)
 ```
@@ -47,7 +47,7 @@ Portal → App Services → **Crear → Aplicación web**:
 | Grupo de recursos | el mismo del servidor MySQL |
 | Nombre | único, por ejemplo `smart-pocket-chef-josuhe` |
 | Publicar | Código |
-| Pila del entorno | **Node 20 LTS** |
+| Pila del entorno | **Node 22 LTS** |
 | Sistema operativo | Linux |
 | Región | la misma del servidor MySQL |
 | Plan de Linux | el plan Gratis F1 que ya existe (no crear otro) |
